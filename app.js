@@ -360,7 +360,7 @@ function bindEvents() {
     }, 180);
   });
 
-  ["#stockSearchInput", "#departmentFilter", "#locationFilter", "#statusFilter"].forEach((id) => {
+  ["#stockSearchInput", "#departmentFilter", "#locationFilter", "#statusFilter", "#importanceFilter"].forEach((id) => {
     on(id, "input", renderPOSGrids);
     on(id, "change", renderPOSGrids);
   });
@@ -1125,6 +1125,7 @@ function renderPOSGrids() {
         </div>
 
         <div class="part-name">${escapeHtml(p.part_name || "")}</div>
+        <div class="part-importance-row">${getImportanceBadgeHtml(p)}</div>
 
         <div class="part-meta">
           <div>${escapeHtml(p.part_code || "-")}</div>
@@ -1621,6 +1622,8 @@ window.openAddPartModal = async function(prefill = "") {
   $("#newPartQty").value = 0;
   $("#newPartMin").value = 0;
   $("#newPartMax").value = 0;
+  if ($("#newPartImportanceLevel")) $("#newPartImportanceLevel").value = "C";
+  if ($("#newPartImportanceReason")) $("#newPartImportanceReason").value = "";
 
   if ($("#newPartImagePath")) $("#newPartImagePath").value = "";
   setImagePreview("newPartImagePreview", "");
@@ -1656,6 +1659,8 @@ function openEditPartModal(stockBalanceId) {
   $("#newPartMax").value = p.max_qty || 0;
   $("#newPartShelf").value = p.shelf_bin || "";
   $("#newPartNote").value = p.part_note || "";
+  if ($("#newPartImportanceLevel")) $("#newPartImportanceLevel").value = normalizeImportanceLevel(p.importance_level || "C");
+  if ($("#newPartImportanceReason")) $("#newPartImportanceReason").value = p.importance_reason || "";
 
   if ($("#newPartImagePath")) $("#newPartImagePath").value = getPartImageSrc(p);
   setImagePreview("newPartImagePreview", getPartImageSrc(p));
@@ -1836,6 +1841,8 @@ async function handleAddNewPartSubmit(e) {
     p_image_path: $("#newPartImagePath")?.value || ""
   };
 
+  const importancePayload = getImportanceFormPayload();
+
   if (!payload.p_part_code) return showToast("ระบบยังไม่ได้สร้างรหัสอะไหล่ กรุณาปิดแล้วเปิดฟอร์มเพิ่มใหม่", "warn");
   if (!payload.p_part_name) return showToast("กรุณากรอกชื่ออะไหล่", "warn");
 
@@ -1869,6 +1876,7 @@ async function handleAddNewPartSubmit(e) {
   }
 
   const partId = await getPartIdByPartCode(savedPartCode || payload.p_part_code);
+  await savePartImportance(partId, importancePayload);
   await savePartCompatibleMachines(partId, getSelectedCompatibleMachines());
 
   closeAddPartModal();
@@ -1947,6 +1955,31 @@ function normalizeExcelRow(row) {
   return { barcode, part_code: partCode || barcode, part_name: partName, model: pick(row, ["รุ่น", "Model", "model"]), brand: pick(row, ["ยี่ห้อ", "Brand", "brand"]), category: pick(row, ["หมวดหมู่", "Category", "category"]), unit: pick(row, ["หน่วย", "Unit", "unit"]) || "Pcs", stock_location: pick(row, ["Stock Location", "stock_location", "จุดเก็บสต็อก"]) || "Main MVR/MSR Stock", used_departments: pick(row, ["Used Departments", "Departments", "department", "แผนก", "แผนกที่ใช้งาน"]) || "MVR,MSR", shelf_bin: shelf, qty: pickNum(row, ["จำนวนคงเหลือ", "Qty", "qty", "Quantity", "จำนวน"], 0), min_qty: pickNum(row, ["Min Qty", "Min", "min_qty", "จำนวนขั้นต่ำ"], 0), max_qty: pickNum(row, ["Max Qty", "Max", "max_qty", "จำนวนสูงสุด"], 0), compatible_machines_values: machineText.split(/[,，\/|]/).map((x) => x.trim()).filter(Boolean), image_path: pick(row, ["รูป", "รูปอะไหล่", "Image", "Image URL", "image_path", "image_url"]), note: pick(row, ["หมายเหตุ", "Note", "note"]) };
 }
 
+
+function getPartForExport(row = {}) {
+  const partCode = String(row.part_code || "").trim();
+  const barcode = String(row.barcode || "").trim();
+  const partId = String(row.part_id || "").trim();
+
+  return (state.parts || []).find((p) => {
+    return (
+      (partId && String(p.part_id || p.id || "") === partId) ||
+      (partCode && String(p.part_code || "").trim() === partCode) ||
+      (barcode && String(p.barcode || "").trim() === barcode)
+    );
+  }) || row;
+}
+
+function getExportImportance(row = {}) {
+  const p = getPartForExport(row);
+  const meta = getImportanceMeta(typeof p.importance_level !== "undefined" ? p.importance_level : row.importance_level);
+  return {
+    level: meta.key,
+    text: meta.text,
+    reason: p.importance_reason || row.importance_reason || ""
+  };
+}
+
 function exportAllPartsToExcel() {
   if (isUser()) return showToast("สิทธิ์ User ค้นหาและดูรายการอะไหล่ได้ แต่ไม่สามารถ Export ได้", "warn");
   exportPartsRows(state.parts, "อะไหล่ทั้งหมด");
@@ -1955,8 +1988,34 @@ function exportLowStockToExcel() { exportPartsRows(state.parts.filter((p) => ["l
 
 function exportPartsRows(rows, filePrefix) {
   if (!rows.length) return showToast("ไม่มีข้อมูลสำหรับส่งออก", "warn");
-  const exportRows = rows.map((p, index) => { const st = getStockStatus(p); return { "ลำดับ": index + 1, "สถานะ": st.text, "บาร์โค้ด": p.barcode || "", "รหัสอะไหล่": p.part_code || "", "ชื่ออะไหล่": p.part_name || "", "รุ่น": p.model || "", "ยี่ห้อ": p.brand || "", "หมวดหมู่": p.category || "", "ใช้กับเครื่องจักร": p.compatible_machines || "", "จุดเก็บ": p.stock_location_name || "", "แผนกที่ใช้ร่วมกัน": p.used_departments || "", "ตำแหน่งจัดเก็บ": p.shelf_bin || "", "จำนวนคงเหลือ": Number(p.qty || 0), "หน่วย": p.unit || "Pcs", "Min Qty": Number(p.min_qty || 0), "Max Qty": Number(p.max_qty || 0), "ควรสั่งเพิ่ม": suggestOrderQty(p), "รูปอะไหล่": getPartImageSrc(p) ? "มีรูป" : "",
-      "หมายเหตุ": p.part_note || "", "วันที่อัปเดต": formatDate(p.updated_at) }; });
+  const exportRows = rows.map((p, index) => {
+    const st = getStockStatus(p);
+    const im = getExportImportance(p);
+    return {
+      "ลำดับ": index + 1,
+      "สถานะ": st.text,
+      "ระดับความสำคัญ": im.text,
+      "เหตุผลความสำคัญ": im.reason,
+      "บาร์โค้ด": p.barcode || "",
+      "รหัสอะไหล่": p.part_code || "",
+      "ชื่ออะไหล่": p.part_name || "",
+      "รุ่น": p.model || "",
+      "ยี่ห้อ": p.brand || "",
+      "หมวดหมู่": p.category || "",
+      "ใช้กับเครื่องจักร": p.compatible_machines || "",
+      "จุดเก็บ": p.stock_location_name || "",
+      "แผนกที่ใช้ร่วมกัน": p.used_departments || "",
+      "ตำแหน่งจัดเก็บ": p.shelf_bin || "",
+      "จำนวนคงเหลือ": Number(p.qty || 0),
+      "หน่วย": p.unit || "Pcs",
+      "Min Qty": Number(p.min_qty || 0),
+      "Max Qty": Number(p.max_qty || 0),
+      "ควรสั่งเพิ่ม": suggestOrderQty(p),
+      "รูปอะไหล่": getPartImageSrc(p) ? "มีรูป" : "",
+      "หมายเหตุ": p.part_note || "",
+      "วันที่อัปเดต": formatDate(p.updated_at)
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(exportRows);
   ws["!cols"] = autoFitWorksheetColumns(exportRows);
   const wb = XLSX.utils.book_new();
@@ -1975,6 +2034,8 @@ function exportAllHistoryToExcel() {
     "ลำดับ": index + 1,
     "วันเวลา": formatDate(h.created_at),
     "ประเภท": safeTxnTypeLabel(h.txn_type),
+    "ระดับความสำคัญ": getExportImportance(h).text,
+    "เหตุผลความสำคัญ": getExportImportance(h).reason,
     "เครื่องจักร / แผนก": h.machine_name || "",
     "บาร์โค้ด": h.barcode || "",
     "รหัสอะไหล่": h.part_code || "",
@@ -2106,7 +2167,10 @@ function getPurchaseRows() {
         p.compatible_machines,
         p.shelf_bin,
         p.supplier,
-        p.po_no
+        p.po_no,
+        p.importance_level,
+        p.importance_text,
+        p.importance_reason
       ]
         .join(" ")
         .toLowerCase();
@@ -2116,8 +2180,10 @@ function getPurchaseRows() {
     .sort((a, b) => {
       const stockRank = { out: 0, low: 1, normal: 2 };
       const flowRank = { need_order: 0, ordering: 1, po_open: 2, waiting_delivery: 3, received: 4 };
+      const importanceRank = { A: 0, B: 1, C: 2 };
 
       return (
+        importanceRank[normalizeImportanceLevel(a.importance_level)] - importanceRank[normalizeImportanceLevel(b.importance_level)] ||
         stockRank[a.stock_status.key] - stockRank[b.stock_status.key] ||
         flowRank[a.procurement_status_key] - flowRank[b.procurement_status_key] ||
         (b.qty_to_order || 0) - (a.qty_to_order || 0)
@@ -2190,6 +2256,7 @@ function renderPurchasePage() {
 
                 <div class="purchase-item-info">
                   <b>${escapeHtml(p.part_name || "-")}</b>
+                  ${getImportanceBadgeHtml(p)}
                   <small>รหัส: ${escapeHtml(p.part_code || "-")}</small>
                   <small>รุ่น: ${escapeHtml(p.model || "-")} / ยี่ห้อ: ${escapeHtml(p.brand || "-")}</small>
                 </div>
@@ -2324,6 +2391,8 @@ async function exportPurchaseToExcel() {
     worksheet.columns = [
       { header: "รูป", key: "image", width: 14 },
       { header: "สถานะสต็อก", key: "stock_status", width: 14 },
+      { header: "ระดับความสำคัญ", key: "importance_level", width: 18 },
+      { header: "เหตุผลความสำคัญ", key: "importance_reason", width: 34 },
       { header: "สถานะจัดซื้อ", key: "procurement_status", width: 18 },
       { header: "บาร์โค้ด", key: "barcode", width: 18 },
       { header: "รหัสอะไหล่", key: "part_code", width: 18 },
@@ -2382,6 +2451,7 @@ async function exportPurchaseToExcel() {
       const rowIndex = i + 2;
 
       const stock = p.stock_status || getStockStatus(p);
+      const im = getExportImportance(p);
       const procurementText =
         p.procurement_status?.text ||
         getProcurementMeta?.(p.procurement_status_key || "need_order")?.text ||
@@ -2393,6 +2463,8 @@ async function exportPurchaseToExcel() {
       worksheet.addRow({
         image: "",
         stock_status: stock.text || "",
+        importance_level: im.text,
+        importance_reason: im.reason,
         procurement_status: procurementText,
         barcode: p.barcode || "",
         part_code: p.part_code || "",
@@ -2430,7 +2502,7 @@ async function exportPurchaseToExcel() {
       excelRow.eachCell((cell, colNumber) => {
         cell.alignment = {
           vertical: "middle",
-          horizontal: [6, 7, 8, 9, 10, 11, 12, 13, 20, 21, 22, 23, 24].includes(colNumber)
+          horizontal: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22, 23, 24, 25, 26].includes(colNumber)
             ? "left"
             : "center",
           wrapText: true
@@ -2462,7 +2534,7 @@ async function exportPurchaseToExcel() {
         }
       };
 
-      excelRow.getCell(14).font = {
+      excelRow.getCell(16).font = {
         bold: true,
         color: {
           argb:
@@ -2474,12 +2546,12 @@ async function exportPurchaseToExcel() {
         }
       };
 
-      excelRow.getCell(17).font = {
+      excelRow.getCell(19).font = {
         bold: true,
         color: { argb: "007AFF" }
       };
 
-      excelRow.getCell(18).font = {
+      excelRow.getCell(20).font = {
         bold: true,
         color: { argb: "007AFF" }
       };
@@ -2502,7 +2574,7 @@ async function exportPurchaseToExcel() {
 
     worksheet.autoFilter = {
       from: { row: 1, column: 1 },
-      to: { row: 1, column: 24 }
+      to: { row: 1, column: worksheet.columns.length }
     };
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -2617,7 +2689,24 @@ function exportTopIssueToExcel() {
   const rows = getTopIssueRows();
   if (!rows.length) return showToast("ไม่มีข้อมูลเบิกเยอะสำหรับส่งออก", "warn");
   const monthText = $("#topIssueMonthPicker")?.value || getCurrentMonthValue();
-  const exportRows = rows.map((r, index) => ({ "อันดับ": index + 1, "เดือน": monthText, "บาร์โค้ด": r.barcode || "", "รหัสอะไหล่": r.part_code || "", "ชื่ออะไหล่": r.part_name || "", "จำนวนเบิกรวม": Number(r.total_qty || 0), "จำนวนครั้งที่เบิก": Number(r.issue_count || 0), "เครื่องจักร/แผนกที่ใช้": r.machine_list.join(", "), "ผู้เบิกล่าสุด": r.last_employee || "", "วันที่เบิกล่าสุด": formatDate(r.last_date), "เหตุผลล่าสุด": r.last_reason || "" }));
+  const exportRows = rows.map((r, index) => {
+    const im = getExportImportance(r);
+    return {
+      "อันดับ": index + 1,
+      "เดือน": monthText,
+      "ระดับความสำคัญ": im.text,
+      "เหตุผลความสำคัญ": im.reason,
+      "บาร์โค้ด": r.barcode || "",
+      "รหัสอะไหล่": r.part_code || "",
+      "ชื่ออะไหล่": r.part_name || "",
+      "จำนวนเบิกรวม": Number(r.total_qty || 0),
+      "จำนวนครั้งที่เบิก": Number(r.issue_count || 0),
+      "เครื่องจักร/แผนกที่ใช้": r.machine_list.join(", "),
+      "ผู้เบิกล่าสุด": r.last_employee || "",
+      "วันที่เบิกล่าสุด": formatDate(r.last_date),
+      "เหตุผลล่าสุด": r.last_reason || ""
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(exportRows);
   ws["!cols"] = autoFitWorksheetColumns(exportRows);
   const wb = XLSX.utils.book_new();
@@ -4759,6 +4848,9 @@ function buildPartSearchText(p = {}) {
     p.stock_location_name,
     p.shelf_bin,
     p.used_departments,
+    p.importance_level,
+    p.importance_text,
+    p.importance_reason,
     Array.isArray(p.compatible_machine_values) ? p.compatible_machine_values.join(" ") : ""
   ]
     .join(" ")
@@ -4773,7 +4865,10 @@ function preparePartRows(rows = []) {
     qty: Number(p.qty || 0),
     min_qty: Number(p.min_qty || 0),
     max_qty: Number(p.max_qty || 0),
-    _searchText: buildPartSearchText(p)
+    importance_level: normalizeImportanceLevel(p.importance_level || "C"),
+    importance_reason: p.importance_reason || "",
+    importance_text: getImportanceMeta(p.importance_level || "C").text,
+    _searchText: buildPartSearchText({ ...p, importance_text: getImportanceMeta(p.importance_level || "C").text })
   }));
 }
 
@@ -4893,6 +4988,7 @@ function getFilteredParts() {
   const dept = $("#departmentFilter")?.value || "";
   const loc = $("#locationFilter")?.value || "";
   const status = $("#statusFilter")?.value || "";
+  const importance = $("#importanceFilter")?.value || "";
   const cat = state.activeCategory?.parts || "All";
 
   let rows = state.parts || [];
@@ -4906,6 +5002,7 @@ function getFilteredParts() {
   }
   if (loc) rows = rows.filter((p) => String(p.stock_location_name || "") === String(loc));
   if (status) rows = rows.filter((p) => getStockStatus(p).key === status);
+  if (importance) rows = rows.filter((p) => normalizeImportanceLevel(p.importance_level || "C") === importance);
   if (cat && cat !== "All") rows = rows.filter((p) => String(p.category || "ไม่ระบุ") === String(cat));
 
   return rows;
@@ -4926,7 +5023,7 @@ function renderPOSGrids() {
     const imgSrc = getPartImageSrc(p);
 
     return `
-      <div class="part-card ${st.key === "out" ? "out-stock" : ""}" data-stock-id="${escapeHtml(p.stock_balance_id)}">
+      <div class="part-card ${st.key === "out" ? "out-stock" : ""} ${isCriticalPart(p) ? "part-critical-outline" : ""}" data-stock-id="${escapeHtml(p.stock_balance_id)}">
         <div class="part-icon">
           ${renderImageOrBox(imgSrc, p.part_name || "part")}
           <span class="unit-badge">${escapeHtml(p.unit || "Pcs")}</span>
@@ -4934,6 +5031,7 @@ function renderPOSGrids() {
         </div>
 
         <div class="part-name">${escapeHtml(p.part_name || "")}</div>
+        <div class="part-importance-row">${getImportanceBadgeHtml(p)}</div>
 
         <div class="part-meta">
           <div>${escapeHtml(p.part_code || "-")}</div>
@@ -5450,3 +5548,112 @@ function injectReadyDeletePartButton(stockBalanceId) {
 }
 
 nodeReadyPatchLoaded = true;
+
+
+/* =========================================================
+   CRITICAL SPARE PARTS / IMPORTANCE LEVEL PATCH
+   A = Critical, B = Important, C = Normal
+========================================================= */
+function normalizeImportanceLevel(level) {
+  const v = String(level || "C").trim().toUpperCase();
+  return ["A", "B", "C"].includes(v) ? v : "C";
+}
+
+function getImportanceMeta(level) {
+  const v = normalizeImportanceLevel(level);
+  const map = {
+    A: { key: "A", className: "a", text: "A สำคัญมาก", shortText: "Critical", icon: "🚨" },
+    B: { key: "B", className: "b", text: "B สำคัญ", shortText: "Important", icon: "⚠️" },
+    C: { key: "C", className: "c", text: "C ทั่วไป", shortText: "Normal", icon: "✅" }
+  };
+  return map[v] || map.C;
+}
+
+function isCriticalPart(part = {}) {
+  return normalizeImportanceLevel(part.importance_level) === "A";
+}
+
+function getImportanceBadgeHtml(part = {}) {
+  const meta = getImportanceMeta(part.importance_level || "C");
+  return `<span class="importance-badge ${meta.className}" title="${escapeHtml(part.importance_reason || meta.text)}">${meta.icon} ${escapeHtml(meta.text)}</span>`;
+}
+
+function getImportanceFormPayload() {
+  return {
+    importance_level: normalizeImportanceLevel($("#newPartImportanceLevel")?.value || "C"),
+    importance_reason: ($("#newPartImportanceReason")?.value || "").trim()
+  };
+}
+
+async function savePartImportance(partId, payload = {}) {
+  if (!partId) return;
+
+  const updatePayload = {
+    importance_level: normalizeImportanceLevel(payload.importance_level || "C"),
+    importance_reason: String(payload.importance_reason || "").trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await sb
+    .from("parts")
+    .update(updatePayload)
+    .eq("id", partId);
+
+  if (error) {
+    console.error(error);
+    throw new Error("บันทึกระดับความสำคัญไม่สำเร็จ กรุณารัน SETUP_SQL_READY.sql เวอร์ชัน Critical Parts ก่อน");
+  }
+}
+
+const CORESYS_IMPORTANCE_ORIGINAL_RENDER_DASHBOARD = renderDashboard;
+renderDashboard = function() {
+  CORESYS_IMPORTANCE_ORIGINAL_RENDER_DASHBOARD();
+
+  const criticalAll = (state.parts || []).filter((p) => isCriticalPart(p));
+  const criticalRisk = criticalAll
+    .filter((p) => ["out", "low"].includes(getStockStatus(p).key))
+    .sort((a, b) => {
+      const stockRank = { out: 0, low: 1, normal: 2 };
+      return stockRank[getStockStatus(a).key] - stockRank[getStockStatus(b).key] || Number(a.qty || 0) - Number(b.qty || 0);
+    })
+    .slice(0, 8);
+
+  if ($("#metricCriticalParts")) {
+    $("#metricCriticalParts").textContent = criticalAll.length.toLocaleString();
+  }
+
+  if ($("#dashboardCriticalList")) {
+    $("#dashboardCriticalList").innerHTML =
+      criticalRisk.map((p) => {
+        const st = getStockStatus(p);
+        return `
+          <div class="critical-item">
+            <div class="critical-title-row">
+              <b>${escapeHtml(p.part_name || "-")}</b>
+              ${getImportanceBadgeHtml(p)}
+            </div>
+            <div class="critical-stock-line">
+              <span>Stock: ${numberFormat(p.qty)}</span>
+              <span>Min: ${numberFormat(p.min_qty)}</span>
+              <span class="${st.key}">${escapeHtml(st.text)}</span>
+            </div>
+            <div class="critical-reason">
+              ${escapeHtml(p.importance_reason || "ยังไม่ได้ระบุเหตุผลความสำคัญ")}
+            </div>
+            <div class="critical-reason">
+              รหัส: ${escapeHtml(p.part_code || "-")} · รุ่น: ${escapeHtml(p.model || "-")} · จุดเก็บ: ${escapeHtml(p.stock_location_name || "-")}
+            </div>
+          </div>
+        `;
+      }).join("") ||
+      `<div class="dashboard-empty">ยังไม่มี Critical Part ที่ใกล้หมดหรือหมดสต็อก</div>`;
+  }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  const importanceFilter = $("#importanceFilter");
+  if (importanceFilter && importanceFilter.dataset.bound !== "1") {
+    importanceFilter.dataset.bound = "1";
+    importanceFilter.addEventListener("change", () => renderPOSGrids?.());
+  }
+});
