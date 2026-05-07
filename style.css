@@ -8478,3 +8478,87 @@ textarea,
   font-size: 12px !important;
   white-space: nowrap !important;
 }
+/* =========================================================
+   CORESYS READY PATCH - PERFORMANCE / MULTI USER UX
+   Added by ChatGPT on 2026-05-07
+========================================================= */
+:root {
+  --ready-border-soft: rgba(0,0,0,0.06);
+}
+
+/* ลดภาระ GPU จาก blur/animation ในหน้าที่มีรายการเยอะ */
+.ready-low-motion *,
+.ready-low-motion *::before,
+.ready-low-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.08s !important;
+  scroll-behavior: auto !important;
+}
+
+.part-result-info {
+  grid-column: 1 / -1;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.search-dropdown-item {
+  user-select: none;
+}
+
+.search-dropdown-item[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.search-action-btn {
+  border: none;
+  border-radius: 999px;
+  background: rgba(0,122,255,0.1);
+  color: var(--ios-blue);
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn[disabled],
+button[disabled] {
+  opacity: 0.58 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+.cart-busy-note {
+  padding: 10px 12px;
+  margin: 10px 0;
+  border-radius: 12px;
+  background: rgba(0,122,255,0.08);
+  color: var(--ios-blue);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.history-display-note {
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.08s !important;
+    scroll-behavior: auto !important;
+  }
+}
