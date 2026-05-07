@@ -7038,3 +7038,1443 @@ body.role-user #exportHistoryBtn {
     min-width: 0 !important;
   }
 }
+
+/* =========================================================
+   ADVANCED AI PROCUREMENT - SMART STOCK CONTROL
+   เพิ่มความสามารถ AI: Days to Stockout, ROP, Safety Stock, Target Stock,
+   Usage Trend, Incoming PO และเหตุผลขออนุมัติ
+========================================================= */
+
+#dashboardSection .ai-procurement-full .ai-procurement-summary,
+.ai-procurement-summary {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+
+.ai-summary-card.purple strong {
+  color: #8b5cf6 !important;
+}
+
+.ai-summary-card.orange strong {
+  color: #f97316 !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-note,
+.ai-procurement-note {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.10), rgba(34, 197, 94, 0.07)) !important;
+  border: 1px solid rgba(0, 122, 255, 0.12) !important;
+  color: #0f62fe !important;
+  font-weight: 900 !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-item {
+  border-color: #e6edf7 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%) !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-item.critical,
+.ai-procurement-item.critical {
+  border-left-color: #ef4444 !important;
+  box-shadow: 0 10px 26px rgba(239, 68, 68, 0.065) !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-item.warning,
+.ai-procurement-item.warning {
+  border-left-color: #f59e0b !important;
+  box-shadow: 0 10px 26px rgba(245, 158, 11, 0.065) !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-item.normal,
+.ai-procurement-item.normal {
+  border-left-color: #22c55e !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-reasons span,
+.ai-procurement-reasons span {
+  background: #eef4fb !important;
+  color: #334155 !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-reasons span:first-child,
+.ai-procurement-reasons span:first-child {
+  background: rgba(0, 122, 255, 0.10) !important;
+  color: #0062cc !important;
+}
+
+#dashboardSection .ai-procurement-full .ai-procurement-reasons span:last-child,
+.ai-procurement-reasons span:last-child {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: #16a34a !important;
+}
+
+.ai-open-po-btn {
+  background: #eef2f7 !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.ai-open-po-btn:hover {
+  background: #e2e8f0 !important;
+}
+
+.ai-risk.critical {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #dc2626 !important;
+}
+
+.ai-risk.warning {
+  background: rgba(245, 158, 11, 0.14) !important;
+  color: #d97706 !important;
+}
+
+.ai-risk.normal {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: #16a34a !important;
+}
+
+.ai-approval-textarea {
+  font-family: 'Kanit', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+@media (max-width: 1300px) {
+  #dashboardSection .ai-procurement-full .ai-procurement-summary,
+  .ai-procurement-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #dashboardSection .ai-procurement-full .ai-procurement-summary,
+  .ai-procurement-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .ai-open-po-btn {
+    width: 100% !important;
+  }
+}
+/* =========================================================
+   FIX PART CARD BADGE / IMAGE BUG
+   แก้แถบหมวดหมู่สีดำยาวทับรูป และปรับการ์ดให้เหมือนตัวอย่าง
+========================================================= */
+
+#partsGridContainer {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)) !important;
+  gap: 16px !important;
+  padding: 8px 0 28px !important;
+  align-items: stretch !important;
+}
+
+/* ตัวการ์ด */
+#partsGridContainer .modern-part-card,
+#partsGridContainer .part-card {
+  background: #ffffff !important;
+  border: 1px solid #e8edf5 !important;
+  border-radius: 18px !important;
+  padding: 10px !important;
+  min-height: 300px !important;
+  height: auto !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#partsGridContainer .modern-part-card:hover,
+#partsGridContainer .part-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.12) !important;
+  border-color: rgba(0, 122, 255, 0.28) !important;
+}
+
+/* ส่วนรูป */
+#partsGridContainer .part-card-media,
+#partsGridContainer .part-icon {
+  position: relative !important;
+  width: 100% !important;
+  height: 150px !important;
+  min-height: 150px !important;
+  max-height: 150px !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #f4f7fb !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: 10px !important;
+}
+
+/* รูปอะไหล่ */
+#partsGridContainer .part-card-media img,
+#partsGridContainer .part-icon img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  padding: 0 !important;
+}
+
+/* กล่องไอคอนกรณีไม่มีรูป */
+#partsGridContainer .part-card-placeholder {
+  font-size: 36px !important;
+  opacity: 0.65 !important;
+}
+
+/* หน่วย Pcs */
+#partsGridContainer .unit-badge {
+  position: absolute !important;
+  left: 10px !important;
+  bottom: 10px !important;
+  top: auto !important;
+  right: auto !important;
+  width: auto !important;
+  height: 24px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: #1677ff !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+/* สถานะ ปกติ / ใกล้หมด / หมด */
+#partsGridContainer .status-badge {
+  position: absolute !important;
+  right: 10px !important;
+  top: 10px !important;
+  left: auto !important;
+  bottom: auto !important;
+  width: auto !important;
+  height: 24px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+}
+
+#partsGridContainer .status-badge.normal {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+#partsGridContainer .status-badge.low {
+  background: #fef3c7 !important;
+  color: #d97706 !important;
+}
+
+#partsGridContainer .status-badge.out {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+}
+
+/* สำคัญ: แก้ตัวที่เป็นแถบดำยาว */
+#partsGridContainer .part-category-badge {
+  position: absolute !important;
+  left: 10px !important;
+  top: 10px !important;
+  bottom: auto !important;
+  right: auto !important;
+
+  width: auto !important;
+  height: 24px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: calc(100% - 95px) !important;
+  max-height: 24px !important;
+
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+
+  background: rgba(15, 23, 42, 0.78) !important;
+  color: #ffffff !important;
+
+  font-size: 8.5px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  transform: none !important;
+  writing-mode: horizontal-tb !important;
+  box-shadow: none !important;
+}
+
+/* เนื้อหาการ์ด */
+#partsGridContainer .part-card-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  flex: 1 !important;
+}
+
+#partsGridContainer .part-name {
+  font-size: 14.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+  color: #0f172a !important;
+  min-height: 39px !important;
+  margin: 0 0 4px !important;
+
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* แถว รหัส / รุ่น / ยี่ห้อ */
+#partsGridContainer .part-code-row,
+#partsGridContainer .part-model-row,
+#partsGridContainer .part-brand-row,
+#partsGridContainer .part-stock-row {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+  font-size: 11.5px !important;
+  line-height: 1.45 !important;
+}
+
+#partsGridContainer .part-code-label,
+#partsGridContainer .part-model-label,
+#partsGridContainer .part-brand-label,
+#partsGridContainer .part-stock-label {
+  min-width: 42px !important;
+  color: #64748b !important;
+  font-weight: 400 !important;
+}
+
+#partsGridContainer .part-code-value,
+#partsGridContainer .part-model-value,
+#partsGridContainer .part-brand-value,
+#partsGridContainer .part-stock-value {
+  color: #0f172a !important;
+  font-weight: 500 !important;
+  word-break: break-word !important;
+}
+
+#partsGridContainer .part-model-value {
+  color: #1677ff !important;
+}
+
+#partsGridContainer .part-stock-row {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+  border-top: 1px dashed #dbe4f0 !important;
+}
+
+#partsGridContainer .part-stock-value {
+  font-size: 18px !important;
+  font-weight: 500 !important;
+}
+
+/* ถ้ามี CSS เก่า part-meta / stock-line ค้าง ให้จัดใหม่ */
+#partsGridContainer .part-meta {
+  font-size: 11.5px !important;
+  color: #64748b !important;
+  line-height: 1.5 !important;
+}
+
+#partsGridContainer .stock-line {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+  border-top: 1px dashed #dbe4f0 !important;
+  color: #1677ff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+/* มือถือ */
+@media (max-width: 768px) {
+  #partsGridContainer {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  #partsGridContainer .modern-part-card,
+  #partsGridContainer .part-card {
+    min-height: 270px !important;
+    padding: 9px !important;
+    border-radius: 16px !important;
+  }
+
+  #partsGridContainer .part-card-media,
+  #partsGridContainer .part-icon {
+    height: 120px !important;
+    min-height: 120px !important;
+    max-height: 120px !important;
+    border-radius: 12px !important;
+  }
+
+  #partsGridContainer .part-name {
+    font-size: 13px !important;
+    min-height: 36px !important;
+  }
+
+  #partsGridContainer .part-code-row,
+  #partsGridContainer .part-model-row,
+  #partsGridContainer .part-brand-row,
+  #partsGridContainer .part-stock-row {
+    font-size: 10.5px !important;
+  }
+
+  #partsGridContainer .part-stock-value {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  #partsGridContainer {
+    grid-template-columns: 1fr !important;
+  }
+
+  #partsGridContainer .part-card-media,
+  #partsGridContainer .part-icon {
+    height: 145px !important;
+    min-height: 145px !important;
+    max-height: 145px !important;
+  }
+}
+/* =========================================================
+   MOBILE PART CARD - PROFESSIONAL LIST STYLE
+   ปรับหน้ารายการอะไหล่ตอนจอเล็กให้ดูง่าย ไม่เทอะทะ
+========================================================= */
+
+@media (max-width: 768px) {
+  /* ลดพื้นที่รวมของหน้า */
+  .main {
+    padding: 12px !important;
+  }
+
+  #partsSection .section-header,
+  #partsSection .page-head,
+  #partsSection .card {
+    border-radius: 18px !important;
+  }
+
+  /* กล่องหมวดหมู่ให้กระชับ */
+  .compact-category-card,
+  .category-filter-card {
+    padding: 12px !important;
+    border-radius: 18px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .compact-category-card .category-filter-title,
+  .category-filter-title {
+    font-size: 15px !important;
+    font-weight: 900 !important;
+  }
+
+  .compact-category-card .category-filter-sub,
+  .category-filter-sub {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+  }
+
+  .category-mobile-select,
+  #partsCategorySelect {
+    height: 46px !important;
+    border-radius: 14px !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+  }
+
+  /* Grid มือถือ = 1 คอลัมน์ แบบ list */
+  #partsGridContainer {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 6px 0 20px !important;
+  }
+
+  /* การ์ดหลัก */
+  #partsGridContainer .modern-part-card,
+  #partsGridContainer .part-card {
+    display: grid !important;
+    grid-template-columns: 108px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+
+    min-height: 128px !important;
+    height: auto !important;
+    padding: 10px !important;
+    border-radius: 18px !important;
+
+    background: #ffffff !important;
+    border: 1px solid #e5edf7 !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.055) !important;
+    overflow: hidden !important;
+  }
+
+  #partsGridContainer .modern-part-card:hover,
+  #partsGridContainer .part-card:hover {
+    transform: none !important;
+    box-shadow: 0 10px 24px rgba(0, 122, 255, 0.10) !important;
+  }
+
+  /* รูปอะไหล่ให้เล็กลงและอยู่ซ้าย */
+  #partsGridContainer .part-card-media,
+  #partsGridContainer .part-icon {
+    width: 108px !important;
+    height: 108px !important;
+    min-width: 108px !important;
+    min-height: 108px !important;
+    max-height: 108px !important;
+
+    margin: 0 !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg, #f8fbff, #eef4fb) !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+  }
+
+  #partsGridContainer .part-card-media img,
+  #partsGridContainer .part-icon img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    padding: 0 !important;
+  }
+
+  #partsGridContainer .part-card-placeholder {
+    font-size: 30px !important;
+    opacity: 0.65 !important;
+  }
+
+  /* badge หมวด */
+  #partsGridContainer .part-category-badge {
+    left: 7px !important;
+    top: 7px !important;
+    right: auto !important;
+    bottom: auto !important;
+
+    width: auto !important;
+    max-width: 86px !important;
+    height: 22px !important;
+    padding: 0 8px !important;
+
+    border-radius: 999px !important;
+    font-size: 9px !important;
+    font-weight: 600 !important;
+
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: #ffffff !important;
+
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* badge หน่วย */
+  #partsGridContainer .unit-badge {
+    left: 7px !important;
+    bottom: 7px !important;
+    top: auto !important;
+    right: auto !important;
+
+    height: 22px !important;
+    padding: 0 8px !important;
+    font-size: 9px !important;
+    border-radius: 999px !important;
+
+    background: #1677ff !important;
+    color: #ffffff !important;
+  }
+
+  /* badge สถานะ */
+  #partsGridContainer .status-badge {
+    right: 7px !important;
+    top: 7px !important;
+    left: auto !important;
+    bottom: auto !important;
+
+    height: 22px !important;
+    padding: 0 8px !important;
+    font-size: 9px !important;
+    border-radius: 999px !important;
+  }
+
+  /* เนื้อหาด้านขวา */
+  #partsGridContainer .part-card-body {
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    padding: 1px 0 !important;
+  }
+
+  #partsGridContainer .part-name {
+    font-size: 14px !important;
+    line-height: 1.35 !important;
+    font-weight: 500 !important;
+    color: #0f172a !important;
+
+    min-height: auto !important;
+    margin: 0 0 5px !important;
+
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  /* แถวข้อมูล */
+  #partsGridContainer .part-code-row,
+  #partsGridContainer .part-model-row,
+  #partsGridContainer .part-brand-row,
+  #partsGridContainer .part-stock-row {
+    display: grid !important;
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+    gap: 5px !important;
+    align-items: baseline !important;
+
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  #partsGridContainer .part-code-label,
+  #partsGridContainer .part-model-label,
+  #partsGridContainer .part-brand-label,
+  #partsGridContainer .part-stock-label {
+    min-width: 0 !important;
+    color: #64748b !important;
+    font-weight: 500 !important;
+  }
+
+  #partsGridContainer .part-code-value,
+  #partsGridContainer .part-model-value,
+  #partsGridContainer .part-brand-value {
+    min-width: 0 !important;
+    color: #0f172a !important;
+    font-weight: 400 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #partsGridContainer .part-model-value {
+    color: #1677ff !important;
+  }
+
+  /* คงเหลือให้เด่นแบบเล็ก ๆ */
+  #partsGridContainer .part-stock-row {
+    margin-top: auto !important;
+    padding-top: 6px !important;
+    border-top: 1px dashed #dbe4f0 !important;
+  }
+
+  #partsGridContainer .part-stock-value {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #0f172a !important;
+  }
+
+  /* ถ้าโครงสร้างเก่ายังมี part-meta/stock-line ให้จัดให้สวย */
+  #partsGridContainer .part-meta {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+    color: #64748b !important;
+  }
+
+  #partsGridContainer .part-meta div {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #partsGridContainer .stock-line {
+    margin-top: auto !important;
+    padding-top: 6px !important;
+    border-top: 1px dashed #dbe4f0 !important;
+    color: #1677ff !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+  }
+}
+
+/* จอเล็กมาก เช่นมือถือแคบ */
+@media (max-width: 420px) {
+  #partsGridContainer .modern-part-card,
+  #partsGridContainer .part-card {
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    gap: 10px !important;
+    padding: 9px !important;
+    border-radius: 16px !important;
+  }
+
+  #partsGridContainer .part-card-media,
+  #partsGridContainer .part-icon {
+    width: 96px !important;
+    height: 96px !important;
+    min-width: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+    border-radius: 14px !important;
+  }
+
+  #partsGridContainer .part-name {
+    font-size: 13px !important;
+  }
+
+  #partsGridContainer .part-code-row,
+  #partsGridContainer .part-model-row,
+  #partsGridContainer .part-brand-row,
+  #partsGridContainer .part-stock-row {
+    font-size: 10.5px !important;
+    grid-template-columns: 36px minmax(0, 1fr) !important;
+  }
+
+  #partsGridContainer .part-stock-value {
+    font-size: 14px !important;
+  }
+}
+/* ซ่อน badge หมวดหมู่บนการ์ดอะไหล่ */
+#partsGridContainer .part-category-badge,
+#partsGridContainer .category-badge,
+#partsGridContainer .part-badge-category {
+  display: none !important;
+}
+
+/* กัน layout เพี้ยนหลังเอา badge ออก */
+#partsGridContainer .part-card-media,
+#partsGridContainer .part-icon {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* =========================================================
+   CORESYS FINAL CLEAN UI PATCH
+   ใช้เป็นชุด Override ท้ายสุดของ style.css
+   แก้:
+   - ตัวหนังสือหนาเกินไป
+   - CSS การ์ดอะไหล่ชนกัน
+   - หมวดหมู่บังรูป
+   - มือถืออ่านยาก
+   - AI Procurement ดูแน่นเกิน
+========================================================= */
+
+/* ---------- Base Typography ---------- */
+body {
+  font-family: 'Kanit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+  color: #0f172a !important;
+}
+
+h1, h2, h3, h4, h5,
+.page-title,
+.section-title,
+.dashboard-panel h3,
+.ai-procurement-panel h3,
+.category-filter-title,
+.pro-page-header h3,
+.topbar h2 {
+  font-weight: 600 !important;
+  letter-spacing: -0.2px !important;
+  color: #0f172a !important;
+}
+
+.muted,
+small,
+.category-filter-sub,
+.dashboard-panel .muted,
+.ai-procurement-panel .muted,
+.brand p {
+  font-weight: 400 !important;
+  color: #64748b !important;
+}
+
+strong,
+b {
+  font-weight: 600 !important;
+}
+
+.btn,
+.nav-btn,
+.cat-pill,
+.badge-status,
+.role-badge,
+.user-active-badge,
+.dept-mini-badge,
+.ai-risk,
+.ai-procurement-reasons span,
+.procurement-status-chip {
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+/* ---------- Inputs ---------- */
+input,
+select,
+textarea,
+.compact-input,
+.form-group input,
+.form-group select,
+.form-group textarea {
+  font-weight: 400 !important;
+}
+
+/* ---------- Dashboard / KPI ---------- */
+.dashboard-kpi-card span,
+.dashboard-kpi-card small,
+.ai-summary-card span,
+.metric-card span,
+.purchase-summary-card span {
+  font-weight: 400 !important;
+}
+
+.dashboard-kpi-card strong,
+.ai-summary-card strong,
+.metric-card strong,
+.purchase-summary-card strong {
+  font-weight: 600 !important;
+  letter-spacing: -0.35px !important;
+}
+
+/* ---------- Sidebar ---------- */
+.nav-btn {
+  font-weight: 450 !important;
+}
+
+.nav-btn.active {
+  font-weight: 550 !important;
+}
+
+/* ---------- Category Filter ---------- */
+.category-filter-title {
+  font-size: 17px !important;
+  margin-bottom: 4px !important;
+}
+
+.category-filter-sub {
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+.parts-category-pills,
+.pos-category-scroll {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  padding: 4px 0 8px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.parts-category-pills::-webkit-scrollbar,
+.pos-category-scroll::-webkit-scrollbar {
+  height: 5px !important;
+}
+
+.parts-category-pills::-webkit-scrollbar-thumb,
+.pos-category-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35) !important;
+  border-radius: 999px !important;
+}
+
+.cat-pill {
+  flex: 0 0 auto !important;
+  min-height: 38px !important;
+  padding: 0 16px !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: none !important;
+}
+
+.cat-pill.active {
+  background: #0f172a !important;
+  border-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+/* =========================================================
+   PART CARD DESKTOP
+========================================================= */
+
+#partsGridContainer {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)) !important;
+  gap: 16px !important;
+  padding: 8px 0 28px !important;
+  align-items: stretch !important;
+}
+
+/* ซ่อนหมวดหมู่บนรูป เพราะบังรูป */
+#partsGridContainer .part-category-badge,
+#partsGridContainer .category-badge,
+#partsGridContainer .part-badge-category {
+  display: none !important;
+}
+
+/* Card */
+#partsGridContainer .modern-part-card,
+#partsGridContainer .part-card,
+#partsGridContainer .pos-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 295px !important;
+  height: auto !important;
+  padding: 10px !important;
+  border-radius: 18px !important;
+
+  background: #ffffff !important;
+  border: 1px solid #e8edf5 !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.055) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+}
+
+#partsGridContainer .modern-part-card:hover,
+#partsGridContainer .part-card:hover,
+#partsGridContainer .pos-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 26px rgba(0, 122, 255, 0.10) !important;
+  border-color: rgba(0, 122, 255, 0.25) !important;
+}
+
+/* Status border */
+#partsGridContainer .modern-part-card.stock-out,
+#partsGridContainer .part-card.stock-out,
+#partsGridContainer .pos-card.out-stock {
+  border-color: rgba(239, 68, 68, 0.28) !important;
+}
+
+#partsGridContainer .modern-part-card.stock-low,
+#partsGridContainer .part-card.stock-low {
+  border-color: rgba(245, 158, 11, 0.28) !important;
+}
+
+/* Image */
+#partsGridContainer .part-card-media,
+#partsGridContainer .part-icon,
+#partsGridContainer .pos-card-img {
+  position: relative !important;
+  width: 100% !important;
+  height: 150px !important;
+  min-height: 150px !important;
+  max-height: 150px !important;
+  margin: 0 0 10px !important;
+
+  border-radius: 14px !important;
+  background: linear-gradient(135deg, #f8fbff, #eef4fb) !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  overflow: hidden !important;
+  font-size: 34px !important;
+  color: #94a3b8 !important;
+}
+
+#partsGridContainer .part-card-media img,
+#partsGridContainer .part-icon img,
+#partsGridContainer .pos-card-img img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: block !important;
+}
+
+/* Unit badge */
+#partsGridContainer .unit-badge,
+#partsGridContainer .pos-card-unit-badge {
+  position: absolute !important;
+  left: 9px !important;
+  bottom: 9px !important;
+  top: auto !important;
+  right: auto !important;
+
+  height: 24px !important;
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 10px !important;
+
+  border-radius: 999px !important;
+  background: #1677ff !important;
+  color: #ffffff !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+
+  box-shadow: 0 6px 14px rgba(22, 119, 255, 0.16) !important;
+  z-index: 2 !important;
+}
+
+/* Status badge */
+#partsGridContainer .status-badge,
+#partsGridContainer .pos-card-badge-low {
+  position: absolute !important;
+  top: 9px !important;
+  right: 9px !important;
+  left: auto !important;
+  bottom: auto !important;
+
+  height: 24px !important;
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 10px !important;
+
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  z-index: 2 !important;
+}
+
+#partsGridContainer .status-badge.normal {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+#partsGridContainer .status-badge.low {
+  background: #fef3c7 !important;
+  color: #d97706 !important;
+}
+
+#partsGridContainer .status-badge.out,
+#partsGridContainer .pos-card-badge-low {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+}
+
+/* Body */
+#partsGridContainer .part-card-body {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  gap: 5px !important;
+}
+
+#partsGridContainer .part-name,
+#partsGridContainer .pos-card-title {
+  margin: 0 0 4px !important;
+  min-height: 38px !important;
+
+  color: #0f172a !important;
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  letter-spacing: -0.1px !important;
+
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* Info rows */
+#partsGridContainer .part-code-row,
+#partsGridContainer .part-model-row,
+#partsGridContainer .part-brand-row,
+#partsGridContainer .part-stock-row {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  gap: 6px !important;
+  align-items: baseline !important;
+
+  font-size: 11.5px !important;
+  line-height: 1.45 !important;
+}
+
+#partsGridContainer .part-code-label,
+#partsGridContainer .part-model-label,
+#partsGridContainer .part-brand-label,
+#partsGridContainer .part-stock-label {
+  color: #64748b !important;
+  font-weight: 400 !important;
+}
+
+#partsGridContainer .part-code-value,
+#partsGridContainer .part-model-value,
+#partsGridContainer .part-brand-value,
+#partsGridContainer .part-stock-value {
+  min-width: 0 !important;
+  color: #0f172a !important;
+  font-weight: 500 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#partsGridContainer .part-model-value {
+  color: #1677ff !important;
+  font-weight: 550 !important;
+}
+
+/* Stock */
+#partsGridContainer .part-stock-row {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+  border-top: 1px dashed #dbe4f0 !important;
+}
+
+#partsGridContainer .part-stock-value {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+}
+
+/* รองรับโครงสร้างเก่า */
+#partsGridContainer .part-meta,
+#partsGridContainer .pos-card-subtitle {
+  display: block !important;
+  margin: 0 0 8px !important;
+  color: #64748b !important;
+  font-size: 11.5px !important;
+  line-height: 1.45 !important;
+  font-weight: 400 !important;
+}
+
+#partsGridContainer .part-meta div,
+#partsGridContainer .pos-card-subtitle div {
+  margin-bottom: 2px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#partsGridContainer .stock-line,
+#partsGridContainer .pos-card-stock {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+  border-top: 1px dashed #dbe4f0 !important;
+  color: #1677ff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+/* =========================================================
+   MOBILE PART CARD
+========================================================= */
+
+@media (max-width: 768px) {
+  .main {
+    padding: 12px !important;
+  }
+
+  .category-filter-title {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+  }
+
+  .category-filter-sub {
+    font-size: 11px !important;
+  }
+
+  .category-mobile-select,
+  #partsCategorySelect {
+    height: 44px !important;
+    border-radius: 14px !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+  }
+
+  #partsGridContainer {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 6px 0 20px !important;
+  }
+
+  #partsGridContainer .modern-part-card,
+  #partsGridContainer .part-card,
+  #partsGridContainer .pos-card {
+    display: grid !important;
+    grid-template-columns: 106px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+
+    min-height: 126px !important;
+    height: auto !important;
+    padding: 10px !important;
+    border-radius: 18px !important;
+
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.052) !important;
+  }
+
+  #partsGridContainer .modern-part-card:hover,
+  #partsGridContainer .part-card:hover,
+  #partsGridContainer .pos-card:hover {
+    transform: none !important;
+  }
+
+  #partsGridContainer .part-card-media,
+  #partsGridContainer .part-icon,
+  #partsGridContainer .pos-card-img {
+    width: 106px !important;
+    height: 106px !important;
+    min-width: 106px !important;
+    min-height: 106px !important;
+    max-height: 106px !important;
+
+    margin: 0 !important;
+    border-radius: 16px !important;
+    font-size: 28px !important;
+  }
+
+  #partsGridContainer .unit-badge,
+  #partsGridContainer .pos-card-unit-badge {
+    left: 7px !important;
+    bottom: 7px !important;
+    height: 22px !important;
+    padding: 0 8px !important;
+    font-size: 9px !important;
+  }
+
+  #partsGridContainer .status-badge,
+  #partsGridContainer .pos-card-badge-low {
+    top: 7px !important;
+    right: 7px !important;
+    height: 22px !important;
+    padding: 0 8px !important;
+    font-size: 9px !important;
+  }
+
+  #partsGridContainer .part-card-body {
+    gap: 3px !important;
+    padding: 1px 0 !important;
+  }
+
+  #partsGridContainer .part-name,
+  #partsGridContainer .pos-card-title {
+    min-height: auto !important;
+    margin: 0 0 5px !important;
+
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+
+    -webkit-line-clamp: 2 !important;
+  }
+
+  #partsGridContainer .part-code-row,
+  #partsGridContainer .part-model-row,
+  #partsGridContainer .part-brand-row,
+  #partsGridContainer .part-stock-row {
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+    gap: 5px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  #partsGridContainer .part-stock-row {
+    padding-top: 6px !important;
+  }
+
+  #partsGridContainer .part-stock-value {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  #partsGridContainer .modern-part-card,
+  #partsGridContainer .part-card,
+  #partsGridContainer .pos-card {
+    grid-template-columns: 94px minmax(0, 1fr) !important;
+    gap: 10px !important;
+    padding: 9px !important;
+    border-radius: 16px !important;
+  }
+
+  #partsGridContainer .part-card-media,
+  #partsGridContainer .part-icon,
+  #partsGridContainer .pos-card-img {
+    width: 94px !important;
+    height: 94px !important;
+    min-width: 94px !important;
+    min-height: 94px !important;
+    max-height: 94px !important;
+    border-radius: 14px !important;
+  }
+
+  #partsGridContainer .part-name,
+  #partsGridContainer .pos-card-title {
+    font-size: 13px !important;
+  }
+
+  #partsGridContainer .part-code-row,
+  #partsGridContainer .part-model-row,
+  #partsGridContainer .part-brand-row,
+  #partsGridContainer .part-stock-row {
+    grid-template-columns: 36px minmax(0, 1fr) !important;
+    font-size: 10.5px !important;
+  }
+
+  #partsGridContainer .part-stock-value {
+    font-size: 14px !important;
+  }
+}
+
+/* =========================================================
+   AI PROCUREMENT SOFT TYPOGRAPHY
+========================================================= */
+
+.ai-procurement-panel,
+.ai-procurement-full {
+  font-weight: 400 !important;
+}
+
+.ai-procurement-title {
+  font-weight: 600 !important;
+  letter-spacing: -0.1px !important;
+}
+
+.ai-procurement-meta {
+  font-weight: 400 !important;
+  color: #64748b !important;
+}
+
+.ai-procurement-reasons span {
+  font-weight: 450 !important;
+}
+
+.ai-procurement-action .btn,
+#aiGoPurchaseBtn {
+  font-weight: 500 !important;
+}
+
+/* ---------- Tables ---------- */
+.pro-table th {
+  font-weight: 500 !important;
+  color: #64748b !important;
+}
+
+.pro-table td {
+  font-weight: 400 !important;
+}
+
+.pro-table td b,
+.pro-table td strong {
+  font-weight: 500 !important;
+}
+
+/* ---------- Modal / Form ---------- */
+.modal-head h3 {
+  font-weight: 600 !important;
+}
+
+.form-group label {
+  font-weight: 500 !important;
+  color: #334155 !important;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  font-weight: 400 !important;
+}
+
+
+/* =========================================================
+   STOCK LOCATION SELECT FIELD
+========================================================= */
+#newPartStockLocation {
+  cursor: pointer !important;
+  appearance: auto !important;
+}
+
+#newPartStockLocation option {
+  font-weight: 400 !important;
+}
+
+/* =========================================================
+   MPR AUTO CODE INPUT - ADD PART ONLY
+========================================================= */
+#newPartCode[readonly] {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #dbeafe !important;
+  font-weight: 500 !important;
+}
+
+#newPartBarcode::placeholder,
+#newPartCode::placeholder {
+  color: #64748b !important;
+  font-weight: 300 !important;
+}
+/* =========================================================
+   PART CARD MODEL HIGHLIGHT
+   ทำให้เลขโมเดลเด่นกว่ายี่ห้อ
+========================================================= */
+
+#partsGridContainer .part-model-brand-line {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  margin-bottom: 3px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#partsGridContainer .part-model-highlight {
+  color: #0062cc !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.1px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#partsGridContainer .part-brand-muted {
+  color: #334155 !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  white-space: nowrap !important;
+}
