@@ -8562,3 +8562,131 @@ button[disabled] {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* =========================================================
+   CRITICAL SPARE PARTS / IMPORTANCE LEVEL
+========================================================= */
+.dashboard-kpi-card.critical {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 70%);
+  border: 1px solid rgba(255, 59, 48, 0.16);
+}
+
+.dashboard-kpi-card.critical strong {
+  color: var(--ios-red);
+}
+
+.importance-form-box {
+  border: 1px solid rgba(255, 149, 0, 0.22);
+  background: rgba(255, 149, 0, 0.055);
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.importance-help {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.importance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.importance-badge.a {
+  background: rgba(255, 59, 48, 0.12);
+  color: #b42318;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+.importance-badge.b {
+  background: rgba(255, 149, 0, 0.14);
+  color: #a05a00;
+  border: 1px solid rgba(255, 149, 0, 0.22);
+}
+
+.importance-badge.c {
+  background: rgba(52, 199, 89, 0.12);
+  color: #168a3a;
+  border: 1px solid rgba(52, 199, 89, 0.18);
+}
+
+.part-importance-row {
+  margin: 7px 0 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.part-critical-outline {
+  border-color: rgba(255, 59, 48, 0.26) !important;
+  box-shadow: 0 8px 24px rgba(255, 59, 48, 0.08) !important;
+}
+
+.critical-dashboard-panel {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.critical-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.critical-item {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  background: #fff;
+}
+
+.critical-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.critical-title-row b {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.critical-reason {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.critical-stock-line {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.critical-stock-line span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f2f2f7;
+}
+
+@media (min-width: 900px) {
+  .filter-panel {
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  }
+}
