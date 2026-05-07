@@ -4698,3 +4698,755 @@ function renderAIStockAdvisor() {
       .join("") ||
     `<div class="ai-empty">✅ ตอนนี้ยังไม่มีรายการเสี่ยงสูงจาก AI</div>`;
 }
+
+/* =========================================================
+   CORESYS READY PATCH - STABILITY / PERFORMANCE / MULTI USER
+   Added by ChatGPT on 2026-05-07
+   จุดประสงค์:
+   1) ลดการ render หนักเมื่อรายการอะไหล่เยอะ
+   2) ลดการโหลดประวัติครั้งละมากเกินจำเป็น
+   3) รับเข้า/เบิกหลายรายการแบบ atomic ผ่าน stock_move_batch
+   4) กันกดซ้ำระหว่างบันทึก
+   5) realtime refresh แบบ debounce เมื่อมีหลายคนใช้งาน
+========================================================= */
+
+window.CORESYS_READY_PATCH_VERSION = "ready-2026-05-07-v1";
+window.CORESYS_READY_PATCH_CONFIG = {
+  partsRenderLimit: 240,
+  searchDropdownLimit: 30,
+  historyLoadLimit: 1200,
+  historyRenderLimit: 600,
+  realtimeDebounceMs: 1200,
+  imageMaxSize: 560,
+  imageQuality: 0.72
+};
+
+state.ready = state.ready || {
+  busy: false,
+  realtimeStarted: false,
+  refreshTimer: null,
+  lastRefreshAt: 0
+};
+
+function readyConfig(key) {
+  return window.CORESYS_READY_PATCH_CONFIG[key];
+}
+
+function setBusyButton(selector, busy, textWhenBusy = "กำลังบันทึก...") {
+  const btn = document.querySelector(selector);
+  if (!btn) return;
+
+  if (busy) {
+    btn.dataset.oldText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = textWhenBusy;
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.oldText) btn.textContent = btn.dataset.oldText;
+    delete btn.dataset.oldText;
+  }
+}
+
+function buildPartSearchText(p = {}) {
+  return [
+    p.barcode,
+    p.part_code,
+    p.part_name,
+    p.model,
+    p.brand,
+    p.category,
+    p.compatible_machines,
+    p.stock_location_name,
+    p.shelf_bin,
+    p.used_departments,
+    Array.isArray(p.compatible_machine_values) ? p.compatible_machine_values.join(" ") : ""
+  ]
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function preparePartRows(rows = []) {
+  return (rows || []).map((p) => ({
+    ...p,
+    qty: Number(p.qty || 0),
+    min_qty: Number(p.min_qty || 0),
+    max_qty: Number(p.max_qty || 0),
+    _searchText: buildPartSearchText(p)
+  }));
+}
+
+async function loadParts() {
+  const { data, error } = await sb
+    .from("v_stock_overview")
+    .select("*")
+    .eq("is_active", true)
+    .order("part_name", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    state.parts = state.parts || [];
+    return showToast("โหลดรายการอะไหล่ไม่สำเร็จ: " + error.message, "error");
+  }
+
+  state.parts = preparePartRows(data || []);
+}
+
+async function loadHistory(options = {}) {
+  const limit = Number(options.limit || readyConfig("historyLoadLimit") || 1200);
+  let query = sb
+    .from("transactions")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (options.employeeId) query = query.eq("employee_id", options.employeeId);
+  if (options.txnType) query = query.eq("txn_type", options.txnType);
+  if (options.fromDate) query = query.gte("created_at", options.fromDate);
+  if (options.toDate) query = query.lt("created_at", options.toDate);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error(error);
+    state.history = state.history || [];
+    return showToast("โหลดประวัติไม่สำเร็จ: " + error.message, "error");
+  }
+
+  state.history = data || [];
+}
+
+async function refreshAll() {
+  try {
+    await Promise.all([
+      loadDepartments(),
+      loadLocations(),
+      loadMasterOptions(),
+      loadUsers(),
+      loadParts(),
+      loadHistory(),
+      loadProcurementTracking()
+    ]);
+
+    renderDynamicDropdowns?.();
+    renderFilters?.();
+    renderPurchaseFilters?.();
+    renderDashboard?.();
+    renderPOSGrids?.();
+    renderReceiveCart?.();
+    renderIssueCart?.();
+    renderPurchasePage?.();
+    renderTopIssuePage?.();
+    renderHistory?.();
+    renderSettings?.();
+    applyRoleAccessUI?.();
+
+    state.ready.lastRefreshAt = Date.now();
+    startRealtimeRefreshOnce();
+  } catch (err) {
+    console.error("refreshAll failed:", err);
+    showToast("รีเฟรชข้อมูลไม่สำเร็จ: " + (err.message || err), "error");
+  }
+}
+
+function scheduleLightRefresh(reason = "data-change") {
+  clearTimeout(state.ready.refreshTimer);
+  state.ready.refreshTimer = setTimeout(async () => {
+    try {
+      await Promise.all([loadParts(), loadHistory(), loadProcurementTracking()]);
+      renderDashboard?.();
+      renderPOSGrids?.();
+      renderReceiveCart?.();
+      renderIssueCart?.();
+      renderPurchasePage?.();
+      renderTopIssuePage?.();
+      renderHistory?.();
+      state.ready.lastRefreshAt = Date.now();
+      console.info("CORESYS light refresh:", reason);
+    } catch (err) {
+      console.warn("light refresh failed", err);
+    }
+  }, readyConfig("realtimeDebounceMs") || 1200);
+}
+
+function startRealtimeRefreshOnce() {
+  if (state.ready.realtimeStarted) return;
+  if (!sb || typeof sb.channel !== "function") return;
+
+  try {
+    state.ready.realtimeStarted = true;
+
+    sb.channel("coresys_inventory_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_balances" }, () => scheduleLightRefresh("stock_balances"))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "transactions" }, () => scheduleLightRefresh("transactions"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "parts" }, () => scheduleLightRefresh("parts"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "procurement_tracking" }, () => scheduleLightRefresh("procurement_tracking"))
+      .subscribe((status) => console.info("CORESYS realtime:", status));
+  } catch (err) {
+    console.warn("Realtime unavailable:", err);
+  }
+}
+
+function getFilteredParts() {
+  const search = ($("#stockSearchInput")?.value || $("#partsSearch")?.value || "").trim().toLowerCase();
+  const dept = $("#departmentFilter")?.value || "";
+  const loc = $("#locationFilter")?.value || "";
+  const status = $("#statusFilter")?.value || "";
+  const cat = state.activeCategory?.parts || "All";
+
+  let rows = state.parts || [];
+
+  if (search) rows = rows.filter((p) => (p._searchText || buildPartSearchText(p)).includes(search));
+  if (dept) {
+    rows = rows.filter((p) => {
+      if (Array.isArray(p.used_department_codes) && p.used_department_codes.includes(dept)) return true;
+      return String(p.used_departments || "").split(",").map((x) => x.trim()).includes(dept);
+    });
+  }
+  if (loc) rows = rows.filter((p) => String(p.stock_location_name || "") === String(loc));
+  if (status) rows = rows.filter((p) => getStockStatus(p).key === status);
+  if (cat && cat !== "All") rows = rows.filter((p) => String(p.category || "ไม่ระบุ") === String(cat));
+
+  return rows;
+}
+
+function renderPOSGrids() {
+  const container = $("#partsGridContainer");
+  if (!container) return;
+
+  renderCategoryPills?.();
+
+  const rows = getFilteredParts();
+  const limit = Number(readyConfig("partsRenderLimit") || 240);
+  const visibleRows = rows.slice(0, limit);
+
+  const cardsHtml = visibleRows.map((p) => {
+    const st = getStockStatus(p);
+    const imgSrc = getPartImageSrc(p);
+
+    return `
+      <div class="part-card ${st.key === "out" ? "out-stock" : ""}" data-stock-id="${escapeHtml(p.stock_balance_id)}">
+        <div class="part-icon">
+          ${renderImageOrBox(imgSrc, p.part_name || "part")}
+          <span class="unit-badge">${escapeHtml(p.unit || "Pcs")}</span>
+          ${st.key !== "normal" ? `<span class="status-badge ${st.key}">${escapeHtml(st.text)}</span>` : ""}
+        </div>
+
+        <div class="part-name">${escapeHtml(p.part_name || "")}</div>
+
+        <div class="part-meta">
+          <div>${escapeHtml(p.part_code || "-")}</div>
+          <div class="part-model-brand-line">
+            <span class="part-model-highlight">${escapeHtml(p.model || "-")}</span>
+            <span class="part-brand-muted"> / ${escapeHtml(p.brand || "-")}</span>
+          </div>
+          <div>จุดเก็บ: ${escapeHtml(p.stock_location_name || "-")}</div>
+        </div>
+
+        <div class="stock-line">Stock: ${numberFormat(p.qty)} / Min: ${numberFormat(p.min_qty)}</div>
+      </div>
+    `;
+  }).join("");
+
+  const moreHtml = rows.length > limit
+    ? `<div class="part-result-info">แสดง ${numberFormat(limit)} จาก ${numberFormat(rows.length)} รายการ — พิมพ์ค้นหา/กรองเพิ่มเพื่อแสดงรายการที่ต้องการเร็วขึ้น</div>`
+    : "";
+
+  container.innerHTML = cardsHtml || `<div class="card">ไม่พบข้อมูลอะไหล่</div>`;
+  if (moreHtml) container.insertAdjacentHTML("beforeend", moreHtml);
+
+  if (container.dataset.readyClickBound !== "1") {
+    container.dataset.readyClickBound = "1";
+    container.addEventListener("click", (e) => {
+      const card = e.target.closest(".part-card[data-stock-id]");
+      if (!card) return;
+      openEditPartModal(card.dataset.stockId);
+    });
+  }
+}
+
+function renderSearchDropdown(type, query) {
+  const q = String(query || "").trim().toLowerCase();
+  const dropdown = type === "receive" ? $("#receiveSearchResults") : $("#issueSearchResults");
+
+  if (!dropdown) return;
+
+  if (!q) {
+    dropdown.classList.add("hidden");
+    dropdown.innerHTML = "";
+    return;
+  }
+
+  const limit = Number(readyConfig("searchDropdownLimit") || 30);
+  const rows = (state.parts || [])
+    .filter((p) => (p._searchText || buildPartSearchText(p)).includes(q))
+    .slice(0, limit);
+
+  if (!rows.length) {
+    dropdown.innerHTML = `
+      <div class="search-dropdown-empty">
+        ไม่พบอะไหล่ "${escapeHtml(query)}"
+        ${type === "receive" ? `<br><button class="search-action-btn" type="button" data-add-prefill="${escapeHtml(query)}">+ เพิ่มอะไหล่ใหม่</button>` : ""}
+      </div>
+    `;
+    dropdown.classList.remove("hidden");
+    return;
+  }
+
+  dropdown.innerHTML = rows.map((p) => {
+    const st = getStockStatus(p);
+    const disabled = type === "issue" && Number(p.qty || 0) <= 0;
+
+    return `
+      <div
+        class="search-dropdown-item"
+        data-stock-balance-id="${escapeHtml(p.stock_balance_id)}"
+        aria-disabled="${disabled ? "true" : "false"}"
+      >
+        <div class="search-icon-box">${renderImageOrBox(getPartImageSrc(p), p.part_name || "part")}</div>
+        <div class="search-dropdown-info">
+          <div class="search-dropdown-model">${escapeHtml(p.model || "-")} / ${escapeHtml(p.brand || "-")}</div>
+          <div class="search-dropdown-name">${escapeHtml(p.part_name || "-")}</div>
+          <div class="search-dropdown-sub">
+            รหัส: ${escapeHtml(p.part_code || "-")} · จุดเก็บ: ${escapeHtml(p.stock_location_name || "-")} · ใช้กับ: ${escapeHtml(p.compatible_machines || "-")}
+          </div>
+        </div>
+        <div class="stock-pill ${st.key === "out" ? "out" : ""}">Stock: ${numberFormat(p.qty)}</div>
+      </div>
+    `;
+  }).join("");
+
+  dropdown.classList.remove("hidden");
+}
+
+window.selectReceiveSearchResult = function (stockBalanceId) {
+  const part = (state.parts || []).find((p) => String(p.stock_balance_id) === String(stockBalanceId));
+  if (!part) return showToast("ไม่พบรายการอะไหล่นี้", "error");
+
+  addItemToCart("receive", part);
+  clearSearch("receive");
+};
+
+window.selectIssueSearchResult = function (stockBalanceId) {
+  const part = (state.parts || []).find((p) => String(p.stock_balance_id) === String(stockBalanceId));
+  if (!part) return showToast("ไม่พบรายการอะไหล่นี้", "error");
+  if (Number(part.qty || 0) <= 0) return showToast("สินค้าหมดสต็อก ไม่สามารถเบิกได้", "error");
+
+  addItemToCart("issue", part);
+  clearSearch("issue");
+};
+
+function addItemToCart(type, part) {
+  const cart = type === "receive" ? state.receiveCart : state.issueCart;
+  const existing = cart.find((item) => String(item.stock_balance_id) === String(part.stock_balance_id));
+  const available = Number(part.qty || 0);
+
+  if (type === "issue" && available <= 0) return showToast("สินค้าหมดสต็อก ไม่สามารถเบิกได้", "error");
+
+  if (existing) {
+    if (type === "issue" && Number(existing.qty || 0) >= available) {
+      return showToast(`สต็อกมีแค่ ${numberFormat(available)} ${part.unit || "Pcs"}`, "warn");
+    }
+    existing.qty += 1;
+  } else {
+    cart.push({
+      stock_balance_id: part.stock_balance_id,
+      part_id: part.part_id,
+      barcode: part.barcode || "",
+      part_code: part.part_code || "",
+      part_name: part.part_name || "",
+      model: part.model || "",
+      brand: part.brand || "",
+      compatible_machines: part.compatible_machines || "",
+      stock_location_name: part.stock_location_name || "",
+      used_departments: part.used_departments || "",
+      stock_qty: available,
+      unit: part.unit || "Pcs",
+      image_path: getPartImageSrc(part),
+      qty: 1
+    });
+  }
+
+  if (type === "receive") renderReceiveCart();
+  else renderIssueCart();
+
+  showToast(type === "receive" ? "เพิ่มเข้ารายการรับเข้าแล้ว" : "เพิ่มเข้ารายการเบิกแล้ว", "success");
+}
+
+function normalizeCartItemsForBatch(cart, type) {
+  return (cart || [])
+    .map((item) => ({
+      stock_balance_id: item.stock_balance_id,
+      qty: Math.max(0, toInt(item.qty)),
+      part_name: item.part_name || "",
+      stock_qty: Number(item.stock_qty || 0),
+      unit: item.unit || "Pcs"
+    }))
+    .filter((item) => item.stock_balance_id && item.qty > 0)
+    .map((item) => {
+      if (type === "OUT" && item.qty > item.stock_qty) {
+        throw new Error(`${item.part_name || "รายการนี้"} มีสต็อกแค่ ${numberFormat(item.stock_qty)} ${item.unit}`);
+      }
+      return item;
+    });
+}
+
+async function rpcStockMoveBatch(txnType, cartItems, meta) {
+  const items = normalizeCartItemsForBatch(cartItems, txnType);
+  if (!items.length) throw new Error("ไม่มีรายการที่ถูกต้อง");
+
+  const payload = items.map((item) => ({
+    stock_balance_id: item.stock_balance_id,
+    qty: item.qty,
+    employee_name: meta.employee_name || "",
+    employee_id: meta.employee_id || "",
+    machine_name: meta.machine_name || "",
+    document_no: meta.document_no || "",
+    reason: meta.reason || "",
+    remark: meta.remark || ""
+  }));
+
+  const { data, error } = await sb.rpc("stock_move_batch", {
+    p_txn_type: txnType,
+    p_items: payload
+  });
+
+  if (!error) return data;
+
+  const msg = String(error.message || "");
+
+  if (!msg.includes("stock_move_batch")) {
+    throw error;
+  }
+
+  console.warn("stock_move_batch not found, fallback to stock_move. Please run SETUP_SQL_READY.sql for atomic multi-user save.");
+
+  for (const item of payload) {
+    const result = await sb.rpc("stock_move", {
+      p_txn_type: txnType,
+      p_stock_balance_id: item.stock_balance_id,
+      p_qty: item.qty,
+      p_employee_name: item.employee_name,
+      p_employee_id: item.employee_id,
+      p_machine_name: item.machine_name,
+      p_document_no: item.document_no,
+      p_reason: item.reason,
+      p_remark: item.remark
+    });
+    if (result.error) throw result.error;
+  }
+
+  return [];
+}
+
+async function refreshAfterStockTransaction() {
+  await Promise.all([loadParts(), loadHistory(), loadProcurementTracking()]);
+  renderDashboard?.();
+  renderPOSGrids?.();
+  renderReceiveCart?.();
+  renderIssueCart?.();
+  renderPurchasePage?.();
+  renderTopIssuePage?.();
+  renderHistory?.();
+  applyCurrentUser?.();
+}
+
+async function confirmReceiveAll() {
+  if (state.ready.busy) return showToast("ระบบกำลังบันทึกรายการก่อนหน้าอยู่", "warn");
+  if (!canReceiveStock()) return showToast("คุณไม่มีสิทธิ์รับเข้าสินค้า", "error");
+  if (!state.receiveCart.length) return showToast("ไม่มีรายการรับเข้า", "warn");
+
+  const validItems = normalizeCartItemsForBatch(state.receiveCart, "IN");
+  const totalQty = validItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+
+  const ok = await iosConfirm(
+    "ยืนยันรับเข้า",
+    `รับสินค้า ${validItems.length} รายการ\nจำนวนรวม ${numberFormat(totalQty)}\n\nยืนยันบันทึกเข้าระบบใช่หรือไม่?`
+  );
+  if (!ok) return;
+
+  try {
+    state.ready.busy = true;
+    setBusyButton("#confirmReceiveBtn", true, "กำลังรับเข้า...");
+
+    await rpcStockMoveBatch("IN", state.receiveCart, {
+      employee_name: $("#receiveEmployeeName")?.value || state.currentUser?.full_name || "",
+      employee_id: $("#receiveEmployeeId")?.value || state.currentUser?.employee_code || "",
+      machine_name: "",
+      document_no: $("#receiveDocNo")?.value || "",
+      reason: "Receive Stock",
+      remark: $("#receiveRemark")?.value || ""
+    });
+
+    state.receiveCart = [];
+    if ($("#receiveDocNo")) $("#receiveDocNo").value = "";
+    if ($("#receiveRemark")) $("#receiveRemark").value = "";
+
+    await refreshAfterStockTransaction();
+    showToast("รับเข้าเรียบร้อย", "success");
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "รับเข้าไม่สำเร็จ", "error");
+  } finally {
+    state.ready.busy = false;
+    setBusyButton("#confirmReceiveBtn", false);
+  }
+}
+
+async function confirmIssueAll() {
+  if (state.ready.busy) return showToast("ระบบกำลังบันทึกรายการก่อนหน้าอยู่", "warn");
+  if (!canIssueStock()) return showToast("คุณไม่มีสิทธิ์เบิกสินค้า", "error");
+  if (!state.issueCart.length) return showToast("ไม่มีรายการเบิก", "warn");
+
+  const employeeName = state.currentUser?.full_name || $("#issueEmployeeName")?.value || "";
+  const employeeId = state.currentUser?.employee_code || $("#issueEmployeeId")?.value || "";
+  const department = state.currentUser?.department_code || $("#issueDepartment")?.value || "";
+  const machineName = ($("#issueMachineName")?.value || "").trim();
+  const reason = ($("#issueReason")?.value || "").trim();
+  const remark = ($("#issueRemark")?.value || "").trim();
+
+  if (!machineName) return showToast("กรุณากรอกเครื่องจักร", "error");
+  if (!reason) return showToast("กรุณาเลือกเหตุผลการเบิก", "error");
+
+  const validItems = normalizeCartItemsForBatch(state.issueCart, "OUT");
+  const totalQty = validItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  const machineFullText = [department ? `Dept: ${department}` : "", `Machine: ${machineName}`].filter(Boolean).join(" | ");
+
+  const ok = await iosConfirm(
+    "ยืนยันเบิกสินค้า",
+    `ผู้เบิก: ${employeeName}\nรหัสพนักงาน: ${employeeId}\nแผนก: ${department || "-"}\nเครื่องจักร: ${machineName}\nเหตุผล: ${reason}\nจำนวนรายการ: ${validItems.length}\nจำนวนรวม: ${numberFormat(totalQty)}\n\nยืนยันการเบิกใช่หรือไม่?`
+  );
+  if (!ok) return;
+
+  try {
+    state.ready.busy = true;
+    setBusyButton("#confirmIssueBtn", true, "กำลังเบิก...");
+
+    await rpcStockMoveBatch("OUT", state.issueCart, {
+      employee_name: employeeName,
+      employee_id: employeeId,
+      machine_name: machineFullText,
+      document_no: "",
+      reason,
+      remark: remark ? `Remark: ${remark}` : ""
+    });
+
+    state.issueCart = [];
+    if ($("#issueMachineName")) $("#issueMachineName").value = "";
+    if ($("#issueReason")) $("#issueReason").value = "";
+    if ($("#issueRemark")) $("#issueRemark").value = "";
+
+    await refreshAfterStockTransaction();
+    showToast("เบิกสินค้าสำเร็จ", "success");
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "เบิกสินค้าไม่สำเร็จ", "error");
+  } finally {
+    state.ready.busy = false;
+    setBusyButton("#confirmIssueBtn", false);
+  }
+}
+
+function compressImageFileToDataUrl(file, maxSize = readyConfig("imageMaxSize"), quality = readyConfig("imageQuality")) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve("");
+
+    if (file.size > 4 * 1024 * 1024) {
+      showToast("รูปมีขนาดใหญ่ ระบบจะบีบอัดเพื่อลดความอืด", "warn");
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const img = new Image();
+
+      img.onload = () => {
+        let { width, height } = img;
+        const safeMax = Number(maxSize || 560);
+
+        if (width > safeMax || height > safeMax) {
+          if (width >= height) {
+            height = Math.round(height * (safeMax / width));
+            width = safeMax;
+          } else {
+            width = Math.round(width * (safeMax / height));
+            height = safeMax;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", Number(quality || 0.72)));
+      };
+
+      img.onerror = () => reject(new Error("อ่านรูปไม่สำเร็จ"));
+      img.src = reader.result;
+    };
+
+    reader.onerror = () => reject(new Error("อ่านไฟล์รูปไม่สำเร็จ"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderHistory() {
+  if (!$("#historyTableBody")) return;
+
+  const allRows = getVisibleHistoryRows();
+  const limit = Number(readyConfig("historyRenderLimit") || 600);
+  const rows = allRows.slice(0, limit);
+
+  const table = $("#historyTableBody");
+  const wrap = table.closest(".table-wrap") || table.parentElement;
+
+  if (wrap && wrap.dataset.readyHistoryNote !== "1") {
+    wrap.dataset.readyHistoryNote = "1";
+    wrap.insertAdjacentHTML(
+      "beforebegin",
+      `<div class="history-display-note">แสดงประวัติล่าสุดสูงสุด ${numberFormat(limit)} รายการ เพื่อให้หน้าเว็บไม่อืด ถ้าต้องการข้อมูลทั้งหมดให้กด Export ประวัติทั้งหมด</div>`
+    );
+  }
+
+  table.innerHTML = rows.map((h) => `
+    <tr>
+      <td>${formatDate(h.created_at)}</td>
+      <td>${safeTxnTypeLabel(h.txn_type)}</td>
+      <td>${escapeHtml(h.machine_name || "")}</td>
+      <td>${escapeHtml(h.barcode || "")}</td>
+      <td>${escapeHtml(h.part_code || "")}</td>
+      <td>${escapeHtml(h.part_name || "")}</td>
+      <td>${numberFormat(h.qty)}</td>
+      <td>${numberFormat(h.before_qty)}</td>
+      <td>${numberFormat(h.after_qty)}</td>
+      <td>${escapeHtml(h.employee_name || "")}</td>
+      <td>${escapeHtml(h.reason || "")}</td>
+      <td>${escapeHtml(h.remark || "")}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="12">${isUser() ? "ยังไม่มีประวัติการเบิกของคุณ" : "ยังไม่มีประวัติ"}</td></tr>`;
+}
+
+async function fetchAllTransactionsForExport() {
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+
+  while (true) {
+    const { data, error } = await sb
+      .from("transactions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+    if (from > 50000) break;
+  }
+
+  return all;
+}
+
+async function exportAllHistoryToExcel() {
+  if (isUser()) return showToast("สิทธิ์ User ดูประวัติได้ แต่ไม่สามารถ Export ประวัติได้", "warn");
+
+  try {
+    showToast("กำลังเตรียมไฟล์ประวัติทั้งหมด...", "info");
+    const visibleRows = canViewAllHistory() ? await fetchAllTransactionsForExport() : getVisibleHistoryRows();
+
+    if (!visibleRows.length) return showToast("ไม่มีประวัติสำหรับส่งออก", "warn");
+
+    const rows = visibleRows.map((h, index) => ({
+      "ลำดับ": index + 1,
+      "วันเวลา": formatDate(h.created_at),
+      "ประเภท": safeTxnTypeLabel(h.txn_type),
+      "เครื่องจักร / แผนก": h.machine_name || "",
+      "บาร์โค้ด": h.barcode || "",
+      "รหัสอะไหล่": h.part_code || "",
+      "ชื่ออะไหล่": h.part_name || "",
+      "จำนวน": Number(h.qty || 0),
+      "ก่อนทำ": Number(h.before_qty || 0),
+      "หลังทำ": Number(h.after_qty || 0),
+      "ผู้ทำรายการ": h.employee_name || "",
+      "รหัสพนักงาน": h.employee_id || "",
+      "เหตุผล": h.reason || "",
+      "หมายเหตุ": h.remark || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = autoFitWorksheetColumns(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ประวัติทั้งหมด");
+    XLSX.writeFileXLSX(wb, `ประวัติทั้งหมด_${formatDateForFileName()}.xlsx`);
+    showToast("ส่งออกประวัติทั้งหมดเรียบร้อย", "success");
+  } catch (err) {
+    console.error(err);
+    showToast("ส่งออกประวัติไม่สำเร็จ: " + (err.message || err), "error");
+  }
+}
+
+window.addEventListener("focus", () => {
+  const diff = Date.now() - Number(state.ready.lastRefreshAt || 0);
+  if (diff > 30000 && state.currentUser) scheduleLightRefresh("window-focus");
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.body.classList.toggle("ready-low-motion", (state.parts || []).length > 300);
+});
+
+/* ---------- Admin soft delete part button ---------- */
+const CORESYS_READY_ORIGINAL_OPEN_EDIT_PART_MODAL = openEditPartModal;
+openEditPartModal = function(stockBalanceId) {
+  CORESYS_READY_ORIGINAL_OPEN_EDIT_PART_MODAL(stockBalanceId);
+  injectReadyDeletePartButton(stockBalanceId);
+};
+
+function injectReadyDeletePartButton(stockBalanceId) {
+  if (!isAdmin()) return;
+  const modal = document.querySelector("#addPartModal");
+  const actions = modal?.querySelector(".modal-actions");
+  const title = document.querySelector("#addPartModalTitle")?.textContent || "";
+  if (!modal || !actions || !title.includes("แก้ไข")) return;
+
+  let btn = document.querySelector("#readyDeletePartBtn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "readyDeletePartBtn";
+    btn.type = "button";
+    btn.className = "btn delete";
+    btn.textContent = "ลบอะไหล่";
+    actions.insertBefore(btn, actions.firstChild);
+  }
+
+  btn.dataset.stockBalanceId = stockBalanceId;
+  btn.onclick = async () => {
+    const p = (state.parts || []).find((x) => String(x.stock_balance_id) === String(stockBalanceId));
+    if (!p) return showToast("ไม่พบอะไหล่ที่ต้องการลบ", "error");
+
+    const ok = await iosConfirm(
+      "ลบอะไหล่",
+      `ต้องการลบ/ปิดใช้งานอะไหล่นี้ใช่หรือไม่?\n\n${p.part_code || "-"} : ${p.part_name || "-"}\n\nระบบจะใช้วิธี Soft Delete เพื่อไม่ให้ประวัติเบิก/รับเข้าเดิมหาย`
+    );
+    if (!ok) return;
+
+    try {
+      const { error } = await sb
+        .from("parts")
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq("id", p.part_id);
+
+      if (error) throw error;
+      closeAddPartModal();
+      await refreshAll();
+      showToast("ลบอะไหล่เรียบร้อย", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("ลบอะไหล่ไม่สำเร็จ: " + (err.message || err), "error");
+    }
+  };
+}
+
+nodeReadyPatchLoaded = true;
