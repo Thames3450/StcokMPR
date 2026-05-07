@@ -396,7 +396,25 @@ function bindEvents() {
     if (!e.target.closest("#receiveSearchInput") && !e.target.closest("#receiveSearchResults")) $("#receiveSearchResults")?.classList.add("hidden");
     if (!e.target.closest("#issueSearchInput") && !e.target.closest("#issueSearchResults")) $("#issueSearchResults")?.classList.add("hidden");
   });
+on("#receiveSearchResults", "click", (e) => {
+  const addBtn = e.target.closest("[data-add-prefill]");
+  if (addBtn) {
+    openAddPartModal(addBtn.dataset.addPrefill || "");
+    return;
+  }
 
+  const row = e.target.closest("[data-stock-balance-id]");
+  if (!row) return;
+
+  selectReceiveSearchResult(row.dataset.stockBalanceId);
+});
+
+on("#issueSearchResults", "click", (e) => {
+  const row = e.target.closest("[data-stock-balance-id]");
+  if (!row) return;
+
+  selectIssueSearchResult(row.dataset.stockBalanceId);
+});
   on("#receiveDetailedCartList", "click", (e) => onCartAction(e, "receive"));
   on("#issueDetailedCartList", "click", (e) => onCartAction(e, "issue"));
   on("#clearReceiveCartBtn", "click", () => { state.receiveCart = []; renderReceiveCart(); });
@@ -548,6 +566,7 @@ async function refreshAll() {
   renderTopIssuePage();
   renderHistory();
   renderSettings();
+  renderStockLocationDropdowns();
   applyRoleAccessUI();
 }
 
@@ -558,9 +577,85 @@ async function loadDepartments() {
 }
 
 async function loadLocations() {
-  const { data, error } = await sb.from("stock_locations").select("*").eq("is_active", true).order("name");
-  if (error) return showToast(error.message, "error");
+  const { data, error } = await sb
+    .from("stock_locations")
+    .select("*")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    showToast("โหลดจุดเก็บสต็อกไม่สำเร็จ: " + error.message, "error");
+    state.locations = [];
+    return;
+  }
+
   state.locations = data || [];
+  renderStockLocationDropdowns();
+}
+
+function getStockLocationNames() {
+  const fromLocations = (state.locations || [])
+    .map((x) => x.name)
+    .filter(Boolean);
+
+  const fromParts = (state.parts || [])
+    .map((p) => p.stock_location_name)
+    .filter(Boolean);
+
+  return [...new Set([...fromLocations, ...fromParts])]
+    .map((x) => String(x).trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "th"));
+}
+
+function fillSelectOptions(el, options, placeholder, keepCurrent = true) {
+  if (!el) return;
+
+  const currentValue = keepCurrent ? el.value : "";
+
+  el.innerHTML = `
+    <option value="">${escapeHtml(placeholder)}</option>
+    ${options
+      .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+      .join("")}
+  `;
+
+  if (currentValue && options.includes(currentValue)) {
+    el.value = currentValue;
+  }
+}
+
+function renderStockLocationDropdowns() {
+  const locations = getStockLocationNames();
+
+  fillSelectOptions($("#newPartStockLocation"), locations, "เลือกจุดเก็บสต็อก");
+  fillSelectOptions($("#locationFilter"), locations, "ทุกจุดเก็บ");
+  fillSelectOptions($("#purchaseLocationFilter"), locations, "ทุกจุดเก็บ");
+
+  if ($("#locationDatalist")) {
+    $("#locationDatalist").innerHTML = locations
+      .map((name) => `<option value="${escapeHtml(name)}"></option>`)
+      .join("");
+  }
+}
+
+function setStockLocationValue(value = "") {
+  const el = $("#newPartStockLocation");
+  if (!el) return;
+
+  renderStockLocationDropdowns();
+
+  const locations = getStockLocationNames();
+  const fallback = locations.includes("Main MVR/MSR Stock")
+    ? "Main MVR/MSR Stock"
+    : (locations[0] || "");
+
+  const finalValue = value && locations.includes(value) ? value : fallback;
+
+  if (finalValue) {
+    el.value = finalValue;
+  }
 }
 
 async function loadMasterOptions() {
@@ -625,6 +720,7 @@ function renderDynamicDropdowns() {
   renderIssueReasonSelect();
   renderCategoryDatalist();
   renderUnitDatalist();
+  renderStockLocationDropdowns();
   renderUserDepartmentSelect();
 }
 
@@ -862,16 +958,17 @@ function renderDashboard() {
 
 function renderFilters() {
   const currentDept = $("#departmentFilter")?.value || "";
+
   if ($("#departmentFilter")) {
-    $("#departmentFilter").innerHTML = `<option value="">ทุกแผนก</option>` + state.departments.map((d) => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.name)} (${escapeHtml(d.code)})</option>`).join("");
+    $("#departmentFilter").innerHTML =
+      `<option value="">ทุกแผนก</option>` +
+      state.departments
+        .map((d) => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.name)} (${escapeHtml(d.code)})</option>`)
+        .join("");
     $("#departmentFilter").value = currentDept;
   }
-  const currentLoc = $("#locationFilter")?.value || "";
-  if ($("#locationFilter")) {
-    $("#locationFilter").innerHTML = `<option value="">ทุกจุดเก็บ</option>` + state.locations.map((l) => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join("");
-    $("#locationFilter").value = currentLoc;
-  }
-  if ($("#locationDatalist")) $("#locationDatalist").innerHTML = state.locations.map((l) => `<option value="${escapeHtml(l.name)}"></option>`).join("");
+
+  renderStockLocationDropdowns();
 }
 
 function renderDepartmentChecks(selected = ["MVR", "MSR"]) {
@@ -1031,7 +1128,10 @@ function renderPOSGrids() {
 
         <div class="part-meta">
           <div>${escapeHtml(p.part_code || "-")}</div>
-          <div>${escapeHtml(p.model || "-")} / ${escapeHtml(p.brand || "-")}</div>
+          <div class="part-model-brand-line">
+  <span class="part-model-highlight">${escapeHtml(p.model || "-")}</span>
+  <span class="part-brand-muted"> / ${escapeHtml(p.brand || "-")}</span>
+</div>
           <div>จุดเก็บ: ${escapeHtml(p.stock_location_name || "-")}</div>
         </div>
 
@@ -1045,44 +1145,178 @@ function renderPOSGrids() {
   });
 }
 
-function handleReceiveLiveSearch(e) { renderSearchDropdown("receive", e.target.value); }
-function handleIssueLiveSearch(e) { renderSearchDropdown("issue", e.target.value); }
-function handleReceiveEnterScan(e) { if (e.key !== "Enter") return; e.preventDefault(); const q = e.target.value.trim(); if (!q) return; const part = findExactPart(q); if (part) { addItemToCart("receive", part); clearSearch("receive"); } else { showToast("ไม่พบข้อมูล กำลังเปิดหน้าเพิ่มอะไหล่ใหม่", "warn"); openAddPartModal(q); } }
-function handleIssueEnterScan(e) { if (e.key !== "Enter") return; e.preventDefault(); const q = e.target.value.trim(); if (!q) return; const part = findExactPart(q); if (part) selectIssueSearchResult(part.stock_balance_id); else showToast("ไม่พบสินค้ารหัส/รุ่นนี้", "error"); }
+function handleReceiveLiveSearch(e) {
+  renderSearchDropdown("receive", e.target.value);
+}
+
+function handleIssueLiveSearch(e) {
+  renderSearchDropdown("issue", e.target.value);
+}
+
+function handleReceiveEnterScan(e) {
+  if (e.key !== "Enter") return;
+
+  e.preventDefault();
+
+  const q = e.target.value.trim();
+  if (!q) return;
+
+  const part = findExactPart(q);
+
+  if (part) {
+    addItemToCart("receive", part);
+    clearSearch("receive");
+  } else {
+    showToast("ไม่พบข้อมูล กำลังเปิดหน้าเพิ่มอะไหล่ใหม่", "warn");
+    openAddPartModal(q);
+  }
+}
+
+function handleIssueEnterScan(e) {
+  if (e.key !== "Enter") return;
+
+  e.preventDefault();
+
+  const q = e.target.value.trim();
+  if (!q) return;
+
+  const part = findExactPart(q);
+
+  if (part) {
+    selectIssueSearchResult(part.stock_balance_id);
+  } else {
+    showToast("ไม่พบสินค้ารหัส/รุ่นนี้", "error");
+  }
+}
 
 function renderSearchDropdown(type, query) {
   const q = String(query || "").trim().toLowerCase();
   const dropdown = type === "receive" ? $("#receiveSearchResults") : $("#issueSearchResults");
+
   if (!dropdown) return;
-  if (!q) { dropdown.classList.add("hidden"); dropdown.innerHTML = ""; return; }
-  const rows = state.parts.filter((p) => [p.barcode, p.part_code, p.part_name, p.model, p.brand, p.category, p.compatible_machines, p.stock_location_name, p.shelf_bin, p.used_departments].join(" ").toLowerCase().includes(q)).slice(0, 12);
-  if (!rows.length) { dropdown.innerHTML = `<div class="search-row"><div></div><div>ไม่พบอะไหล่ "${escapeHtml(query)}"</div>${type === "receive" ? `<button class="btn primary small" onclick="openAddPartModal('${escapeHtml(query)}')">+ เพิ่ม</button>` : ""}</div>`; dropdown.classList.remove("hidden"); return; }
-  dropdown.innerHTML = rows.map((p) => { const st = getStockStatus(p); return `<div class="search-row" onclick="${type === "receive" ? `selectReceiveSearchResult('${p.stock_balance_id}')` : `selectIssueSearchResult('${p.stock_balance_id}')`}"><div class="search-icon">📦</div><div><b>${escapeHtml(p.part_name || "")}</b><br><small>${escapeHtml(p.part_code || "")} · ใช้กับ: ${escapeHtml(p.compatible_machines || "-")} · จุดเก็บ: ${escapeHtml(p.stock_location_name || "-")}</small></div><div class="stock-pill ${st.key === "out" ? "out" : ""}">Stock: ${numberFormat(p.qty)}</div></div>`; }).join("");
+
+  if (!q) {
+    dropdown.classList.add("hidden");
+    dropdown.innerHTML = "";
+    return;
+  }
+
+  const rows = (state.parts || [])
+    .filter((p) => {
+      const text = [
+        p.barcode,
+        p.part_code,
+        p.part_name,
+        p.model,
+        p.brand,
+        p.category,
+        p.compatible_machines,
+        p.stock_location_name,
+        p.shelf_bin,
+        p.used_departments
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return text.includes(q);
+    })
+    .slice(0, 12);
+
+  if (!rows.length) {
+    dropdown.innerHTML = `
+      <div class="search-row">
+        <div></div>
+        <div>ไม่พบอะไหล่ "${escapeHtml(query)}"</div>
+        ${
+          type === "receive"
+            ? `<button class="btn primary small" type="button" data-add-prefill="${escapeHtml(query)}">+ เพิ่ม</button>`
+            : ""
+        }
+      </div>
+    `;
+
+    dropdown.classList.remove("hidden");
+    return;
+  }
+
+  dropdown.innerHTML = rows
+    .map((p) => {
+      const st = getStockStatus(p);
+      const stockBalanceId = String(p.stock_balance_id || "");
+
+      return `
+        <div class="search-row" data-stock-balance-id="${escapeHtml(stockBalanceId)}">
+          <div class="search-icon">📦</div>
+
+          <div>
+            <b>${escapeHtml(p.part_name || "")}</b><br>
+            <small>
+              รหัส: ${escapeHtml(p.part_code || "-")} ·
+              รุ่น: ${escapeHtml(p.model || "-")} ·
+              ใช้กับ: ${escapeHtml(p.compatible_machines || "-")} ·
+              จุดเก็บ: ${escapeHtml(p.stock_location_name || "-")}
+            </small>
+          </div>
+
+          <div class="stock-pill ${st.key === "out" ? "out" : ""}">
+            Stock: ${numberFormat(p.qty)}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
   dropdown.classList.remove("hidden");
 }
 
 function findExactPart(text) {
   const q = String(text || "").trim().toLowerCase();
-  return state.parts.find((p) => String(p.barcode || "").trim().toLowerCase() === q || String(p.part_code || "").trim().toLowerCase() === q || String(p.model || "").trim().toLowerCase() === q);
+
+  return (state.parts || []).find((p) => {
+    return (
+      String(p.barcode || "").trim().toLowerCase() === q ||
+      String(p.part_code || "").trim().toLowerCase() === q ||
+      String(p.model || "").trim().toLowerCase() === q
+    );
+  });
 }
 
-window.selectReceiveSearchResult = function(stockBalanceId) {
-  const part = state.parts.find((p) => p.stock_balance_id === stockBalanceId);
-  if (part) addItemToCart("receive", part);
+window.selectReceiveSearchResult = function (stockBalanceId) {
+  const part = (state.parts || []).find((p) => String(p.stock_balance_id) === String(stockBalanceId));
+
+  if (!part) {
+    return showToast("ไม่พบรายการอะไหล่นี้", "error");
+  }
+
+  addItemToCart("receive", part);
   clearSearch("receive");
 };
 
-window.selectIssueSearchResult = function(stockBalanceId) {
-  const part = state.parts.find((p) => p.stock_balance_id === stockBalanceId);
-  if (!part) return;
-  if (Number(part.qty || 0) <= 0) return showToast("สินค้าหมดสต็อก ไม่สามารถเบิกได้", "error");
+window.selectIssueSearchResult = function (stockBalanceId) {
+  const part = (state.parts || []).find((p) => String(p.stock_balance_id) === String(stockBalanceId));
+
+  if (!part) {
+    return showToast("ไม่พบรายการอะไหล่นี้", "error");
+  }
+
+  if (Number(part.qty || 0) <= 0) {
+    return showToast("สินค้าหมดสต็อก ไม่สามารถเบิกได้", "error");
+  }
+
   addItemToCart("issue", part);
   clearSearch("issue");
 };
 
 function clearSearch(type) {
-  if (type === "receive") { $("#receiveSearchInput").value = ""; $("#receiveSearchResults").classList.add("hidden"); }
-  else { $("#issueSearchInput").value = ""; $("#issueSearchResults").classList.add("hidden"); }
+  const input = type === "receive" ? $("#receiveSearchInput") : $("#issueSearchInput");
+  const dropdown = type === "receive" ? $("#receiveSearchResults") : $("#issueSearchResults");
+
+  if (input) input.value = "";
+
+  if (dropdown) {
+    dropdown.classList.add("hidden");
+    dropdown.innerHTML = "";
+  }
 }
 
 function bindScannerListener() {
@@ -1271,13 +1505,118 @@ async function confirmIssueAll() {
   } catch (err) { showToast(err.message, "error"); }
 }
 
-window.openAddPartModal = function(prefill = "") {
-  if (!canEditParts()) return showToast("สิทธิ์นี้ไม่สามารถเพิ่มหรือแก้ไขอะไหล่ในคลังได้", "error");
+
+/* =========================================================
+   AUTO PART CODE - MPR NEXT NUMBER FOR ADD PART ONLY
+   ทำงานเหมือนเว็บตัวอย่าง แต่เปลี่ยนจาก P เป็น MPR-เลขถัดไป
+   - กดเพิ่มอะไหล่: ดูเลข MPR ล่าสุดจาก state.parts ที่โหลดจากฐานข้อมูล
+   - แสดงเลขในช่อง Barcode และ รหัสอะไหล่
+   - บันทึกเลขเดียวกับที่เห็นในฟอร์ม
+========================================================= */
+
+function isAddPartMode() {
+  const title = $("#addPartModalTitle")?.textContent || "";
+  return title.includes("เพิ่ม");
+}
+
+function isAutoPartCodeLoadingValue(value) {
+  const v = String(value || "").trim();
+  return (
+    !v ||
+    v === "กำลังสร้างรหัส..." ||
+    v === "ระบบจะสร้างตอนบันทึก" ||
+    v === "AUTO"
+  );
+}
+
+function formatMprCode(number) {
+  const safeNumber = Math.max(1, parseInt(number, 10) || 1);
+  return `MPR-${String(safeNumber).padStart(5, "0")}`;
+}
+
+function getMprNumberFromCode(code) {
+  const text = String(code || "").trim().toUpperCase();
+  const match = text.match(/^MPR-?(\d+)$/);
+  if (!match) return 0;
+
+  const n = parseInt(match[1], 10);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function generateNextMprCodeFromParts(parts = []) {
+  let maxNumber = 0;
+
+  (parts || []).forEach((p) => {
+    const partCodeNumber = getMprNumberFromCode(p.part_code);
+    const barcodeNumber = getMprNumberFromCode(p.barcode);
+
+    if (partCodeNumber > maxNumber) maxNumber = partCodeNumber;
+    if (barcodeNumber > maxNumber) maxNumber = barcodeNumber;
+  });
+
+  return formatMprCode(maxNumber + 1);
+}
+
+/*
+   รองรับโค้ดเก่าที่อาจยังเรียก generateNextCode(lastCode)
+   ของเดิมเป็น P001 / P002
+   ตัวใหม่นี้คืนค่าเป็น MPR-00001 / MPR-00002
+*/
+function generateNextCode(lastCode) {
+  const currentNumber = getMprNumberFromCode(lastCode);
+  return formatMprCode(currentNumber + 1);
+}
+
+function fillAutoPartCodeForNewPart(prefillBarcode = "") {
+  if (!isAddPartMode()) return;
+
+  const barcodeInput = $("#newPartBarcode");
+  const codeInput = $("#newPartCode");
+  const nextCode = generateNextMprCodeFromParts(state.parts || []);
+
+  if (codeInput) {
+    codeInput.readOnly = true;
+    codeInput.value = nextCode;
+    codeInput.placeholder = "ระบบสร้างรหัส MPR ให้อัตโนมัติ";
+    codeInput.title = "รหัสนี้สร้างจากเลข MPR ล่าสุดในฐานข้อมูล";
+  }
+
+  if (barcodeInput) {
+    barcodeInput.readOnly = false;
+    barcodeInput.value = String(prefillBarcode || "").trim() || nextCode;
+    barcodeInput.placeholder = "ระบบสร้างบาร์โค้ด MPR ให้อัตโนมัติ";
+    barcodeInput.title = "ถ้าไม่ได้สแกนบาร์โค้ด ระบบจะใช้เลขเดียวกับรหัสอะไหล่";
+  }
+}
+
+async function ensureAutoPartCodeBeforeSave() {
+  if (!isAddPartMode()) return;
+
+  const barcodeInput = $("#newPartBarcode");
+  const codeInput = $("#newPartCode");
+
+  if (!codeInput) return;
+
+  if (!String(codeInput.value || "").trim()) {
+    codeInput.value = generateNextMprCodeFromParts(state.parts || []);
+  }
+
+  if (barcodeInput && !String(barcodeInput.value || "").trim()) {
+    barcodeInput.value = codeInput.value;
+  }
+}
+
+window.openAddPartModal = async function(prefill = "") {
+  if (!canEditParts()) {
+    return showToast("สิทธิ์นี้ไม่สามารถเพิ่มหรือแก้ไขอะไหล่ในคลังได้", "error");
+  }
+
   $("#addPartForm").reset();
   $("#addPartModalTitle").textContent = "เพิ่มอะไหล่";
-  $("#newPartBarcode").value = prefill || "";
-  $("#newPartCode").value = prefill || "";
-  $("#newPartStockLocation").value = "Main MVR/MSR Stock";
+
+  fillAutoPartCodeForNewPart(prefill);
+
+  setStockLocationValue("Main MVR/MSR Stock");
   $("#newPartUnit").value = "Pcs";
   $("#newPartQty").value = 0;
   $("#newPartMin").value = 0;
@@ -1290,6 +1629,7 @@ window.openAddPartModal = function(prefill = "") {
   if ($("#machineCompatSearch")) $("#machineCompatSearch").value = "";
   renderCompatibleMachineChecks([]);
   renderDepartmentChecks(["MVR", "MSR"]);
+
   $("#addPartModal").classList.add("active");
 };
 
@@ -1301,12 +1641,16 @@ function openEditPartModal(stockBalanceId) {
   $("#addPartModalTitle").textContent = "แก้ไขอะไหล่";
   $("#newPartBarcode").value = p.barcode || "";
   $("#newPartCode").value = p.part_code || "";
+  if ($("#newPartCode")) {
+    $("#newPartCode").readOnly = true;
+    $("#newPartCode").placeholder = "รหัสอะไหล่เดิม";
+  }
   $("#newPartName").value = p.part_name || "";
   $("#newPartModel").value = p.model || "";
   $("#newPartBrand").value = p.brand || "";
   $("#newPartCategory").value = p.category || "";
   $("#newPartUnit").value = p.unit || "Pcs";
-  $("#newPartStockLocation").value = p.stock_location_name || "Main MVR/MSR Stock";
+  setStockLocationValue(p.stock_location_name || "Main MVR/MSR Stock");
   $("#newPartQty").value = p.qty || 0;
   $("#newPartMin").value = p.min_qty || 0;
   $("#newPartMax").value = p.max_qty || 0;
@@ -1466,19 +1810,23 @@ async function handleAddNewPartSubmit(e) {
 
   if (!canEditParts()) return showToast("สิทธิ์นี้ไม่สามารถบันทึกหรือแก้ไขอะไหล่ในคลังได้", "error");
 
+  const isAddingNewPart = isAddPartMode();
+
   const depts = [...document.querySelectorAll("#departmentCheckboxList input:checked")].map((x) => x.value);
 
   if (!depts.length) return showToast("กรุณาเลือกแผนกที่ใช้ร่วมกัน", "warn");
 
+  await ensureAutoPartCodeBeforeSave();
+
   const payload = {
-    p_barcode: $("#newPartBarcode").value.trim(),
+    p_barcode: $("#newPartBarcode").value.trim() || $("#newPartCode").value.trim(),
     p_part_code: $("#newPartCode").value.trim(),
     p_part_name: $("#newPartName").value.trim(),
     p_model: $("#newPartModel").value.trim(),
     p_brand: $("#newPartBrand").value.trim(),
     p_category: $("#newPartCategory").value.trim(),
     p_unit: $("#newPartUnit").value.trim() || "Pcs",
-    p_stock_location: $("#newPartStockLocation").value.trim() || "Main MVR/MSR Stock",
+    p_stock_location: $("#newPartStockLocation").value.trim() || getStockLocationNames()[0] || "Main MVR/MSR Stock",
     p_used_departments: depts.join(","),
     p_shelf_bin: $("#newPartShelf").value.trim(),
     p_qty: toInt($("#newPartQty").value),
@@ -1488,19 +1836,50 @@ async function handleAddNewPartSubmit(e) {
     p_image_path: $("#newPartImagePath")?.value || ""
   };
 
-  if (!payload.p_part_code && !payload.p_barcode) return showToast("กรุณากรอกรหัสอะไหล่หรือบาร์โค้ด", "warn");
+  if (!payload.p_part_code) return showToast("ระบบยังไม่ได้สร้างรหัสอะไหล่ กรุณาปิดแล้วเปิดฟอร์มเพิ่มใหม่", "warn");
   if (!payload.p_part_name) return showToast("กรุณากรอกชื่ออะไหล่", "warn");
 
-  const { error } = await sb.rpc("import_stock_row", payload);
-  if (error) return showToast(error.message, "error");
+  let savedPartCode = payload.p_part_code;
+  let error = null;
 
-  const partId = await getPartIdByPartCode(payload.p_part_code);
+  if (isAddingNewPart) {
+    // เพิ่มใหม่: ให้ฐานข้อมูลสร้างรหัสจริงตอนบันทึกเท่านั้น
+    // ถ้ากดยกเลิกหรือเปิดฟอร์มทิ้งไว้ เลขจะไม่ถูกรันหาย
+    const result = await sb.rpc("import_stock_row_auto_code", payload);
+    error = result.error;
+    savedPartCode = result.data || "";
+  } else {
+    // แก้ไข: ใช้รหัสเดิม
+    if (!payload.p_part_code || isAutoPartCodeLoadingValue(payload.p_part_code)) {
+      return showToast("ไม่พบรหัสอะไหล่เดิมสำหรับแก้ไข", "error");
+    }
+
+    const result = await sb.rpc("import_stock_row", payload);
+    error = result.error;
+  }
+
+  if (error) {
+    console.error(error);
+
+    if (String(error.message || "").includes("import_stock_row_auto_code")) {
+      return showToast("ยังไม่ได้รัน SQL ฟังก์ชันสร้างรหัสอัตโนมัติ กรุณารัน SETUP_SQL.sql ก่อน", "error");
+    }
+
+    return showToast(error.message, "error");
+  }
+
+  const partId = await getPartIdByPartCode(savedPartCode || payload.p_part_code);
   await savePartCompatibleMachines(partId, getSelectedCompatibleMachines());
 
   closeAddPartModal();
   await refreshAll();
 
-  showToast("บันทึกอะไหล่สำเร็จ", "success");
+  showToast(
+    isAddingNewPart && savedPartCode
+      ? `บันทึกอะไหล่สำเร็จ รหัสใหม่คือ ${savedPartCode}`
+      : "บันทึกอะไหล่สำเร็จ",
+    "success"
+  );
 }
 
 function renderCompatibleMachineChecks(selectedValues = []) {
@@ -1620,9 +1999,17 @@ function exportAllHistoryToExcel() {
 
 function renderPurchaseFilters() {
   const currentDept = $("#purchaseDepartmentFilter")?.value || "";
-  const currentLoc = $("#purchaseLocationFilter")?.value || "";
-  if ($("#purchaseDepartmentFilter")) { $("#purchaseDepartmentFilter").innerHTML = `<option value="">ทุกแผนก</option>` + state.departments.map((d) => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.name)} (${escapeHtml(d.code)})</option>`).join(""); $("#purchaseDepartmentFilter").value = currentDept; }
-  if ($("#purchaseLocationFilter")) { $("#purchaseLocationFilter").innerHTML = `<option value="">ทุกจุดเก็บ</option>` + state.locations.map((l) => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join(""); $("#purchaseLocationFilter").value = currentLoc; }
+
+  if ($("#purchaseDepartmentFilter")) {
+    $("#purchaseDepartmentFilter").innerHTML =
+      `<option value="">ทุกแผนก</option>` +
+      state.departments
+        .map((d) => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.name)} (${escapeHtml(d.code)})</option>`)
+        .join("");
+    $("#purchaseDepartmentFilter").value = currentDept;
+  }
+
+  renderStockLocationDropdowns();
 }
 function getProcurementMeta(key = "need_order") {
   const map = {
@@ -2306,6 +2693,7 @@ async function saveLocation() {
 
   await loadLocations();
   renderFilters();
+  renderStockLocationDropdowns();
   renderLocationManager();
 
   showToast("บันทึกจุดเก็บเรียบร้อย และอัปเดต Dropdown แล้ว", "success");
@@ -2392,6 +2780,7 @@ async function deleteLocationFromTable(id) {
   await loadParts();
 
   renderFilters();
+  renderStockLocationDropdowns();
   renderLocationManager();
   renderPOSGrids();
   renderPurchasePage();
@@ -3441,6 +3830,7 @@ function renderSettings() {
     if (typeof renderOptionsManager === "function") renderOptionsManager();
     if (typeof renderCategoryDatalist === "function") renderCategoryDatalist();
     if (typeof renderUnitDatalist === "function") renderUnitDatalist();
+    if (typeof renderStockLocationDropdowns === "function") renderStockLocationDropdowns();
     if (typeof renderUserDepartmentSelect === "function") renderUserDepartmentSelect();
     if (typeof renderLocationManager === "function") renderLocationManager();
     if (typeof renderUserManager === "function") renderUserManager();
@@ -3771,9 +4161,31 @@ async function importPartsFromFile(e) {
 
 
 /* =========================================================
-   AI PROCUREMENT ASSISTANT
-   วิเคราะห์สั่งซื้อ + สร้างเหตุผลให้บัญชี/ผู้ใหญ่อนุมัติ
+   ADVANCED AI PROCUREMENT ASSISTANT
+   คำนวณสั่งซื้อแบบฉลาดจาก Stock, Min/Max, ประวัติการเบิก, Lead Time,
+   Safety Stock, Reorder Point, Days to Stockout และสถานะจัดซื้อ
 ========================================================= */
+
+const AI_PROCUREMENT_CONFIG = {
+  leadTimeDays: 30,      // ระยะเวลาซื้อโดยประมาณ ถ้าไม่รู้กำหนดไว้ 30 วัน
+  safetyDays: 14,        // กันความเสี่ยงเผื่อใช้ฉุกเฉิน
+  reviewDays: 30,        // รอบตรวจสต็อก/รอบสั่งซื้อ
+  defaultCoverDays: 60,  // เป้าหมายให้สต็อกพอใช้ประมาณ 2 เดือน ถ้าไม่มี Max
+  recentDays: 30,
+  historyDays: 90,
+  displayLimit: 8
+};
+
+function clampNumber(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(Math.max(n, min), max);
+}
+
+function parseTimeSafe(value) {
+  const t = new Date(value || 0).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
 
 function getPartHistoryUsage(part, days = 90) {
   const now = Date.now();
@@ -3785,7 +4197,7 @@ function getPartHistoryUsage(part, days = 90) {
 
   const rows = state.history.filter((h) => {
     const isOut = String(h.txn_type || "").toUpperCase() === "OUT";
-    const time = new Date(h.created_at || 0).getTime();
+    const time = parseTimeSafe(h.created_at);
 
     const samePart =
       String(h.part_code || "").trim() === partCode ||
@@ -3806,129 +4218,274 @@ function getPartHistoryUsage(part, days = 90) {
     ...new Set(rows.map((h) => String(h.reason || "").trim()).filter(Boolean))
   ];
 
+  const lastTxn = rows
+    .slice()
+    .sort((a, b) => parseTimeSafe(b.created_at) - parseTimeSafe(a.created_at))[0];
+
   return {
     rows,
     qty,
     count,
     machines,
     reasons,
+    lastDate: lastTxn?.created_at || "",
     avgMonthly: days > 0 ? qty / (days / 30) : 0,
     avgDaily: days > 0 ? qty / days : 0
   };
 }
 
-function getAIProcurementLevel(item) {
-  if (item.stockStatus === "out") return "critical";
-  if (item.daysLeft !== null && item.daysLeft <= 14) return "critical";
-  if (item.stockStatus === "low") return "warning";
-  if (item.usage90.qty > 0 && item.daysLeft !== null && item.daysLeft <= 30) return "warning";
-  return "normal";
-}
+function getPartUsageTrend(part) {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const partCode = String(part.part_code || "").trim();
+  const barcode = String(part.barcode || "").trim();
+  const partName = String(part.part_name || "").trim();
 
-function getAIProcurementLevelText(level) {
-  if (level === "critical") return "เร่งด่วน";
-  if (level === "warning") return "ควรสั่ง";
-  return "ติดตาม";
-}
+  const matchPart = (h) => {
+    const isOut = String(h.txn_type || "").toUpperCase() === "OUT";
+    const samePart =
+      String(h.part_code || "").trim() === partCode ||
+      String(h.barcode || "").trim() === barcode ||
+      String(h.part_name || "").trim() === partName;
+    return isOut && samePart;
+  };
 
-function buildAIProcurementRows(limit = 8) {
-  const leadTimeDays = 30;
-
-  const rows = state.parts.map((p) => {
-    const qty = Number(p.qty || 0);
-    const minQty = Number(p.min_qty || 0);
-    const maxQty = Number(p.max_qty || 0);
-
-    const st = getStockStatus(p);
-    const usage30 = getPartHistoryUsage(p, 30);
-    const usage90 = getPartHistoryUsage(p, 90);
-
-    const avgDaily = usage90.avgDaily || usage30.avgDaily || 0;
-    const daysLeft = avgDaily > 0 ? Math.floor(qty / avgDaily) : null;
-
-    const targetByMax = maxQty > 0 ? maxQty : 0;
-    const targetByMin = minQty;
-    const targetByUsage = avgDaily > 0 ? Math.ceil(avgDaily * leadTimeDays) + minQty : 0;
-
-    const targetQty = Math.max(targetByMax, targetByMin, targetByUsage);
-    let suggestQty = Math.max(0, targetQty - qty);
-
-    if (typeof suggestOrderQty === "function") {
-      suggestQty = Math.max(suggestQty, Number(suggestOrderQty(p) || 0));
-    }
-
-    let score = 0;
-
-    if (st.key === "out") score += 120;
-    if (st.key === "low") score += 80;
-    if (usage90.qty > 0) score += Math.min(60, usage90.qty * 4);
-    if (usage30.qty > 0) score += Math.min(40, usage30.qty * 5);
-    if (daysLeft !== null && daysLeft <= 14) score += 50;
-    if (daysLeft !== null && daysLeft <= 30) score += 25;
-    if (suggestQty > 0) score += 20;
-
-    const levelItem = {
-      part: p,
-      stockStatus: st.key,
-      stockText: st.text,
-      usage30,
-      usage90,
-      qty,
-      minQty,
-      maxQty,
-      avgDaily,
-      daysLeft,
-      suggestQty,
-      score
-    };
-
-    const level = getAIProcurementLevel(levelItem);
-
-    return {
-      ...levelItem,
-      level,
-      levelText: getAIProcurementLevelText(level)
-    };
+  const recent30 = state.history.filter((h) => {
+    const t = parseTimeSafe(h.created_at);
+    return matchPart(h) && t >= now - 30 * dayMs;
   });
 
-  return rows
-    .filter((x) => x.score > 0 || x.suggestQty > 0 || ["out", "low"].includes(x.stockStatus))
-    .sort((a, b) => b.score - a.score)
+  const previous30 = state.history.filter((h) => {
+    const t = parseTimeSafe(h.created_at);
+    return matchPart(h) && t < now - 30 * dayMs && t >= now - 60 * dayMs;
+  });
+
+  const recentQty = recent30.reduce((sum, h) => sum + Number(h.qty || 0), 0);
+  const previousQty = previous30.reduce((sum, h) => sum + Number(h.qty || 0), 0);
+
+  let trend = 0;
+  if (previousQty > 0) trend = (recentQty - previousQty) / previousQty;
+  else if (recentQty > 0) trend = 1;
+
+  return {
+    recentQty,
+    previousQty,
+    trend,
+    trendPercent: Math.round(trend * 100),
+    trendText:
+      trend >= 0.5 ? "การใช้เพิ่มขึ้น" :
+      trend <= -0.5 ? "การใช้ลดลง" :
+      recentQty > 0 ? "ใช้งานต่อเนื่อง" :
+      "ไม่พบการเบิกล่าสุด"
+  };
+}
+
+function getIncomingProcurement(part) {
+  const proc = getProcurementRow(part.stock_balance_id);
+  const status = String(proc?.status || "need_order");
+  const activeIncoming = ["ordering", "po_open", "waiting_delivery"].includes(status);
+  const qty = activeIncoming ? Number(proc?.qty_to_order || 0) : 0;
+  const expectedDate = proc?.expected_date || "";
+  const expectedTime = expectedDate ? parseTimeSafe(expectedDate) : 0;
+  const daysToArrive = expectedTime ? Math.ceil((expectedTime - Date.now()) / (24 * 60 * 60 * 1000)) : null;
+
+  return {
+    proc,
+    status,
+    activeIncoming,
+    qty,
+    expectedDate,
+    daysToArrive
+  };
+}
+
+function calculateSmartProcurementMetrics(part) {
+  const cfg = AI_PROCUREMENT_CONFIG;
+  const qty = clampNumber(part.qty);
+  const minQty = clampNumber(part.min_qty);
+  const maxQty = clampNumber(part.max_qty);
+
+  const stockStatus = getStockStatus(part);
+  const usage30 = getPartHistoryUsage(part, cfg.recentDays);
+  const usage90 = getPartHistoryUsage(part, cfg.historyDays);
+  const trend = getPartUsageTrend(part);
+  const incoming = getIncomingProcurement(part);
+
+  // ใช้ 90 วันเป็นฐาน ถ้าไม่มีข้อมูล ใช้ 30 วัน ถ้ามีแนวโน้มเพิ่มให้เผื่อ Demand มากขึ้น
+  let avgDaily = usage90.avgDaily || usage30.avgDaily || 0;
+  if (trend.trend >= 0.5 && usage30.avgDaily > avgDaily) {
+    avgDaily = usage30.avgDaily;
+  }
+
+  const avgMonthly = avgDaily * 30;
+  const daysLeft = avgDaily > 0 ? Math.floor(qty / avgDaily) : null;
+  const daysLeftAfterIncoming = avgDaily > 0 ? Math.floor((qty + incoming.qty) / avgDaily) : null;
+
+  const reorderPoint = Math.ceil(avgDaily * (cfg.leadTimeDays + cfg.safetyDays));
+  const safetyStock = Math.ceil(avgDaily * cfg.safetyDays);
+
+  const targetByMax = maxQty > 0 ? maxQty : 0;
+  const targetByUsage = avgDaily > 0 ? Math.ceil(avgDaily * cfg.defaultCoverDays) : 0;
+  const targetByMin = minQty > 0 ? minQty * 2 : 0;
+  const targetStock = Math.max(targetByMax, targetByUsage, targetByMin, minQty);
+
+  let suggestQty = Math.max(0, targetStock - qty - incoming.qty);
+
+  // ถ้าต่ำกว่า Min หรือหมด แต่ไม่มี Max/History ให้สั่งอย่างน้อยถึง Min
+  if (suggestQty <= 0 && ["out", "low"].includes(stockStatus.key)) {
+    suggestQty = Math.max(1, minQty - qty - incoming.qty);
+  }
+
+  // ถ้ามีฟังก์ชันเดิมช่วยคำนวณ ให้ใช้เป็นค่าขั้นต่ำด้วย
+  if (typeof suggestOrderQty === "function") {
+    suggestQty = Math.max(suggestQty, Number(suggestOrderQty(part) || 0) - incoming.qty);
+  }
+
+  suggestQty = Math.max(0, Math.ceil(suggestQty));
+
+  const willStockoutBeforeLeadTime = daysLeft !== null && daysLeft <= cfg.leadTimeDays;
+  const belowReorderPoint = qty <= reorderPoint;
+  const incomingLate = incoming.activeIncoming && incoming.daysToArrive !== null && daysLeft !== null && incoming.daysToArrive > daysLeft;
+
+  let score = 0;
+  const reasons = [];
+
+  if (stockStatus.key === "out") {
+    score += 160;
+    reasons.push("หมดสต็อก");
+  }
+  if (stockStatus.key === "low") {
+    score += 100;
+    reasons.push("ต่ำกว่า/ใกล้ Min");
+  }
+  if (willStockoutBeforeLeadTime) {
+    score += 90;
+    reasons.push(`คาดว่าจะหมดใน ${daysLeft} วัน`);
+  }
+  if (belowReorderPoint && avgDaily > 0) {
+    score += 70;
+    reasons.push(`ต่ำกว่า ROP ${numberFormat(reorderPoint)}`);
+  }
+  if (usage90.qty > 0) {
+    score += Math.min(55, usage90.qty * 3);
+    reasons.push(`เบิก 90 วัน ${numberFormat(usage90.qty)} ${part.unit || "Pcs"}`);
+  }
+  if (trend.trend >= 0.5) {
+    score += 30;
+    reasons.push("การใช้เพิ่มขึ้น");
+  }
+  if (incoming.activeIncoming) {
+    score -= 30;
+    reasons.push(`มีรายการจัดซื้อ ${numberFormat(incoming.qty)} ${part.unit || "Pcs"}`);
+  }
+  if (incomingLate) {
+    score += 35;
+    reasons.push("ของอาจมาช้ากว่าวันหมด");
+  }
+  if (suggestQty > 0) {
+    score += 35;
+    reasons.push(`แนะนำสั่ง ${numberFormat(suggestQty)} ${part.unit || "Pcs"}`);
+  }
+
+  const riskPercent = Math.max(0, Math.min(100, Math.round(score / 3)));
+
+  let level = "normal";
+  let levelText = "ติดตาม";
+  let aiAction = "ติดตามสต็อก";
+
+  if (stockStatus.key === "out" || willStockoutBeforeLeadTime || incomingLate) {
+    level = "critical";
+    levelText = "เร่งด่วน";
+    aiAction = incoming.activeIncoming ? "เร่งติดตามของเข้า" : "สั่งซื้อทันที";
+  } else if (stockStatus.key === "low" || belowReorderPoint || suggestQty > 0) {
+    level = "warning";
+    levelText = "ควรสั่ง";
+    aiAction = incoming.activeIncoming ? "ติดตาม PO" : "เปิด PR/PO";
+  }
+
+  return {
+    part,
+    stockStatus: stockStatus.key,
+    stockText: stockStatus.text,
+    usage30,
+    usage90,
+    trend,
+    incoming,
+    qty,
+    minQty,
+    maxQty,
+    avgDaily,
+    avgMonthly,
+    daysLeft,
+    daysLeftAfterIncoming,
+    reorderPoint,
+    safetyStock,
+    targetStock,
+    suggestQty,
+    willStockoutBeforeLeadTime,
+    belowReorderPoint,
+    incomingLate,
+    level,
+    levelText,
+    aiAction,
+    riskPercent,
+    score,
+    reasons: reasons.slice(0, 6)
+  };
+}
+
+function buildAIProcurementRows(limit = AI_PROCUREMENT_CONFIG.displayLimit) {
+  return state.parts
+    .map(calculateSmartProcurementMetrics)
+    .filter((x) =>
+      x.score > 0 ||
+      x.suggestQty > 0 ||
+      ["out", "low"].includes(x.stockStatus) ||
+      x.willStockoutBeforeLeadTime ||
+      x.belowReorderPoint
+    )
+    .sort((a, b) => b.score - a.score || b.suggestQty - a.suggestQty)
     .slice(0, limit);
 }
 
-function generatePurchaseApprovalText(stockBalanceId) {
-  const item = buildAIProcurementRows(999).find(
-    (x) => String(x.part.stock_balance_id) === String(stockBalanceId)
-  );
+function getAIProcurementRowByStockBalanceId(stockBalanceId) {
+  return state.parts
+    .map(calculateSmartProcurementMetrics)
+    .find((x) => String(x.part.stock_balance_id) === String(stockBalanceId));
+}
 
+function generatePurchaseApprovalText(stockBalanceId) {
+  const item = getAIProcurementRowByStockBalanceId(stockBalanceId);
   if (!item) return "";
 
   const p = item.part;
   const unit = p.unit || "Pcs";
-  const usage90 = item.usage90;
-  const usage30 = item.usage30;
   const suggestQty = Math.max(1, Number(item.suggestQty || 0));
 
-  const machineText = usage90.machines.length
-    ? usage90.machines.slice(0, 5).join(", ")
+  const machineText = item.usage90.machines.length
+    ? item.usage90.machines.slice(0, 6).join(", ")
     : (p.compatible_machines || "-");
 
-  const reasonText = usage90.reasons.length
-    ? usage90.reasons.slice(0, 3).join(", ")
+  const reasonText = item.usage90.reasons.length
+    ? item.usage90.reasons.slice(0, 4).join(", ")
     : "ใช้สำหรับซ่อมบำรุง / PM / สำรองกรณีเครื่องจักรเสียฉุกเฉิน";
 
-  const stockRisk =
-    item.stockStatus === "out"
-      ? "ปัจจุบันอะไหล่หมดสต็อก ทำให้มีความเสี่ยงต่อการซ่อมฉุกเฉินและอาจทำให้ Downtime สูงขึ้น"
-      : item.stockStatus === "low"
-      ? "ปัจจุบันจำนวนคงเหลือต่ำกว่าหรือใกล้เคียงค่า Min จึงมีความเสี่ยงที่จะไม่เพียงพอต่อการใช้งานครั้งถัดไป"
-      : "รายการนี้มีแนวโน้มการใช้งานต่อเนื่อง ควรจัดเตรียมสต็อกให้พร้อม";
+  const daysLeftText = item.daysLeft !== null
+    ? `คาดว่าสต็อกจะเพียงพอประมาณ ${item.daysLeft} วัน จากค่าเฉลี่ยการใช้งานปัจจุบัน`
+    : "ไม่มีค่าเฉลี่ยการใช้งานที่แน่นอน แต่เป็นอะไหล่ที่ต้องสำรองเพื่อรองรับงานซ่อม";
 
-  const daysLeftText =
-    item.daysLeft !== null
-      ? `จากอัตราการใช้งานเฉลี่ย คาดว่าสต็อกอาจเพียงพอประมาณ ${item.daysLeft} วัน`
-      : "ไม่มีค่าเฉลี่ยการใช้งานที่แน่นอน แต่เป็นอะไหล่ที่ควรสำรองเพื่อรองรับงานซ่อม";
+  const incomingText = item.incoming.activeIncoming
+    ? `มีรายการจัดซื้ออยู่แล้ว ${numberFormat(item.incoming.qty)} ${unit} สถานะ ${getProcurementMeta(item.incoming.status).text}${item.incoming.expectedDate ? ` กำหนดเข้า ${item.incoming.expectedDate}` : ""}`
+    : "ยังไม่มีรายการจัดซื้อที่กำลังดำเนินการในระบบ";
+
+  const riskText =
+    item.stockStatus === "out"
+      ? "ปัจจุบันอะไหล่หมดสต็อก ทำให้มีความเสี่ยงสูงต่อการซ่อมฉุกเฉินและอาจทำให้ Downtime เพิ่มขึ้น"
+      : item.willStockoutBeforeLeadTime
+      ? `สต็อกมีแนวโน้มหมดภายใน ${item.daysLeft} วัน ซึ่งน้อยกว่าระยะเวลาจัดซื้อประมาณ ${AI_PROCUREMENT_CONFIG.leadTimeDays} วัน`
+      : item.belowReorderPoint
+      ? `จำนวนคงเหลือต่ำกว่า Reorder Point (${numberFormat(item.reorderPoint)} ${unit}) จึงควรเปิดสั่งซื้อก่อนถึงจุดขาดสต็อก`
+      : "รายการนี้มีความสำคัญต่อความพร้อมของอะไหล่และควรติดตามตามรอบสั่งซื้อ";
 
   return (
 `ขออนุมัติสั่งซื้ออะไหล่
@@ -3936,27 +4493,32 @@ function generatePurchaseApprovalText(stockBalanceId) {
 รายการ: ${p.part_name || "-"}
 รหัสอะไหล่: ${p.part_code || "-"}
 รุ่น / ยี่ห้อ: ${p.model || "-"} / ${p.brand || "-"}
-จำนวนที่แนะนำให้สั่ง: ${suggestQty} ${unit}
+จำนวนที่ AI แนะนำให้สั่ง: ${suggestQty} ${unit}
 จุดเก็บ: ${p.stock_location_name || "-"}
 ตำแหน่ง: ${p.shelf_bin || "-"}
 แผนกที่ใช้: ${p.used_departments || "-"}
 เครื่องจักรที่เกี่ยวข้อง: ${machineText}
 
 เหตุผลประกอบการสั่งซื้อ:
-${stockRisk}
+${riskText}
 
-ข้อมูลประกอบจากระบบ:
+ข้อมูลวิเคราะห์จากระบบ:
 - คงเหลือปัจจุบัน: ${numberFormat(item.qty)} ${unit}
 - Min Stock: ${numberFormat(item.minQty)} ${unit}
 - Max Stock: ${numberFormat(item.maxQty)} ${unit}
-- ประวัติการเบิก 30 วันล่าสุด: ${numberFormat(usage30.qty)} ${unit} (${numberFormat(usage30.count)} ครั้ง)
-- ประวัติการเบิก 90 วันล่าสุด: ${numberFormat(usage90.qty)} ${unit} (${numberFormat(usage90.count)} ครั้ง)
-- ค่าเฉลี่ยการใช้งานโดยประมาณ: ${usage90.avgMonthly.toFixed(1)} ${unit}/เดือน
+- Safety Stock ที่ AI คำนวณ: ${numberFormat(item.safetyStock)} ${unit}
+- Reorder Point (ROP): ${numberFormat(item.reorderPoint)} ${unit}
+- Target Stock ที่เหมาะสม: ${numberFormat(item.targetStock)} ${unit}
+- ประวัติการเบิก 30 วันล่าสุด: ${numberFormat(item.usage30.qty)} ${unit} (${numberFormat(item.usage30.count)} ครั้ง)
+- ประวัติการเบิก 90 วันล่าสุด: ${numberFormat(item.usage90.qty)} ${unit} (${numberFormat(item.usage90.count)} ครั้ง)
+- ค่าเฉลี่ยการใช้งาน: ${item.avgMonthly.toFixed(1)} ${unit}/เดือน
 - ${daysLeftText}
+- แนวโน้มการใช้งาน: ${item.trend.trendText}${item.trend.trendPercent ? ` (${item.trend.trendPercent}%)` : ""}
+- สถานะจัดซื้อปัจจุบัน: ${incomingText}
 - เหตุผลการใช้งานที่ผ่านมา: ${reasonText}
 
 สรุป:
-แนะนำให้สั่งซื้อรายการนี้เพื่อป้องกันอะไหล่ไม่เพียงพอต่อการซ่อมบำรุง ลดความเสี่ยง Downtime และรองรับงานซ่อมฉุกเฉิน/PM ตามแผน`
+แนะนำให้อนุมัติการสั่งซื้อรายการนี้ตามจำนวนที่เสนอ เพื่อป้องกันอะไหล่ไม่เพียงพอต่อการซ่อมบำรุง ลดความเสี่ยง Downtime และรองรับงานซ่อมฉุกเฉิน/PM ตามแผน`
   );
 }
 
@@ -4015,17 +4577,47 @@ async function copyAIApprovalReason() {
   }
 }
 
+function goToPurchaseFromAI(stockBalanceId) {
+  if (typeof canManageProcurement === "function" && !canManageProcurement()) {
+    return showToast("สิทธิ์นี้ไม่สามารถจัดการสถานะจัดซื้อได้", "warn");
+  }
+
+  if (typeof window.showSection === "function") {
+    window.showSection("purchaseSection");
+  } else {
+    document.querySelector('button[data-section="purchaseSection"]')?.click();
+  }
+
+  setTimeout(() => {
+    if (typeof openProcurementModal === "function") {
+      openProcurementModal(stockBalanceId);
+    }
+  }, 250);
+}
+
 function renderAIStockAdvisor() {
   const summaryEl = $("#aiStockSummary");
   const listEl = $("#aiStockAdvisorList");
 
   if (!summaryEl || !listEl) return;
 
-  const rows = buildAIProcurementRows(6);
+  const allRows = state.parts.map(calculateSmartProcurementMetrics);
+  const rows = allRows
+    .filter((x) =>
+      x.score > 0 ||
+      x.suggestQty > 0 ||
+      ["out", "low"].includes(x.stockStatus) ||
+      x.willStockoutBeforeLeadTime ||
+      x.belowReorderPoint
+    )
+    .sort((a, b) => b.score - a.score || b.suggestQty - a.suggestQty)
+    .slice(0, AI_PROCUREMENT_CONFIG.displayLimit);
 
-  const outCount = state.parts.filter((p) => getStockStatus(p).key === "out").length;
-  const lowCount = state.parts.filter((p) => getStockStatus(p).key === "low").length;
-  const criticalCount = rows.filter((x) => x.level === "critical").length;
+  const outCount = allRows.filter((x) => x.stockStatus === "out").length;
+  const lowCount = allRows.filter((x) => x.stockStatus === "low").length;
+  const stockoutInLeadTime = allRows.filter((x) => x.willStockoutBeforeLeadTime).length;
+  const belowRopCount = allRows.filter((x) => x.belowReorderPoint).length;
+  const pendingIncoming = allRows.filter((x) => x.incoming.activeIncoming).length;
   const suggestTotal = rows.reduce((sum, x) => sum + Number(x.suggestQty || 0), 0);
 
   summaryEl.innerHTML = `
@@ -4035,18 +4627,28 @@ function renderAIStockAdvisor() {
     </div>
 
     <div class="ai-summary-card warning">
-      <span>ใกล้หมด</span>
-      <strong>${numberFormat(lowCount)}</strong>
+      <span>ต่ำกว่า ROP</span>
+      <strong>${numberFormat(belowRopCount)}</strong>
     </div>
 
     <div class="ai-summary-card blue">
-      <span>เร่งด่วน</span>
-      <strong>${numberFormat(criticalCount)}</strong>
+      <span>คาดหมดใน LT</span>
+      <strong>${numberFormat(stockoutInLeadTime)}</strong>
     </div>
 
     <div class="ai-summary-card green">
-      <span>จำนวนแนะนำ</span>
+      <span>แนะนำสั่งรวม</span>
       <strong>${numberFormat(suggestTotal)}</strong>
+    </div>
+
+    <div class="ai-summary-card purple">
+      <span>รอของเข้า</span>
+      <strong>${numberFormat(pendingIncoming)}</strong>
+    </div>
+
+    <div class="ai-summary-card orange">
+      <span>ใกล้หมด</span>
+      <strong>${numberFormat(lowCount)}</strong>
     </div>
   `;
 
@@ -4056,11 +4658,10 @@ function renderAIStockAdvisor() {
         const p = item.part;
         const imgSrc = getPartImageSrc(p);
         const unit = p.unit || "Pcs";
-
-        const daysLeftText =
-          item.daysLeft !== null
-            ? `คาดว่าเหลือ ${item.daysLeft} วัน`
-            : "ไม่มีค่าเฉลี่ยชัดเจน";
+        const daysLeftText = item.daysLeft !== null ? `หมดใน ${item.daysLeft} วัน` : "ไม่มีประวัติเฉลี่ย";
+        const incomingText = item.incoming.activeIncoming
+          ? `รอเข้า ${numberFormat(item.incoming.qty)} ${unit}`
+          : `ROP ${numberFormat(item.reorderPoint)}`;
 
         return `
           <div class="ai-procurement-item ${item.level}">
@@ -4077,16 +4678,19 @@ function renderAIStockAdvisor() {
               </div>
 
               <div class="ai-procurement-reasons">
-                <span>${escapeHtml(item.stockText)}</span>
-                <span>เบิก 90 วัน: ${numberFormat(item.usage90.qty)} ${escapeHtml(unit)}</span>
+                <span>${escapeHtml(item.aiAction)}</span>
                 <span>${escapeHtml(daysLeftText)}</span>
-                <span>แนะนำสั่ง ${numberFormat(item.suggestQty)} ${escapeHtml(unit)}</span>
+                <span>เบิก 90 วัน: ${numberFormat(item.usage90.qty)} ${escapeHtml(unit)}</span>
+                <span>${escapeHtml(incomingText)}</span>
+                <span>Target ${numberFormat(item.targetStock)}</span>
+                <span>สั่ง ${numberFormat(item.suggestQty)} ${escapeHtml(unit)}</span>
               </div>
             </div>
 
             <div class="ai-procurement-action">
-              <span class="ai-risk ${item.level}">${escapeHtml(item.levelText)}</span>
+              <span class="ai-risk ${item.level}">${escapeHtml(item.levelText)} • ${numberFormat(item.riskPercent)}%</span>
               <button type="button" class="btn primary small" onclick="showAIApprovalReason('${escapeHtml(p.stock_balance_id)}')">สร้างเหตุผล</button>
+              <button type="button" class="btn secondary small ai-open-po-btn" onclick="goToPurchaseFromAI('${escapeHtml(p.stock_balance_id)}')">เปิดจัดซื้อ</button>
             </div>
           </div>
         `;
