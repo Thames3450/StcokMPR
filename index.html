@@ -32,7 +32,7 @@
           type="text"
           id="loginEmployeeCode"
           class="login-input"
-          placeholder="กรอกรหัสพนักงาน"
+          placeholder="กรอกรหัสพนักงาน เช่น ADMIN001"
           autocomplete="off"
         />
       </div>
@@ -90,7 +90,7 @@
     <div class="dashboard-enterprise-hero-left">
       <div class="dashboard-chip">ENTERPRISE INVENTORY CONTROL CENTER</div>
       <h2>Dashboard</h2>
-      <p>ภาพรวมสต็อกอะไหล่ การเคลื่อนไหวประจำวัน และรายการที่ต้องติดตาม</p>
+      <p>ภาพรวมสต็อกอะไหล่ การเคลื่อนไหวประจำวัน และรายการที่ต้องติดตามแบบองค์กร</p>
 
       <div class="dashboard-hero-meta">
         <span id="dashboardDateLabel">-</span>
@@ -150,6 +150,15 @@
       <small>รายการเร่งด่วน</small>
     </div>
 
+    <div class="dashboard-kpi-card critical">
+      <div class="dashboard-kpi-top">
+        <span>Critical Parts</span>
+        <div class="dashboard-kpi-icon">🚨</div>
+      </div>
+      <strong id="metricCriticalParts">0</strong>
+      <small>อะไหล่กลุ่ม A สำคัญต่อการผลิต</small>
+    </div>
+
     <div class="dashboard-kpi-card green">
       <div class="dashboard-kpi-top">
         <span>รับเข้าวันนี้</span>
@@ -188,6 +197,16 @@
     </div>
 
     <div id="aiStockAdvisorList" class="ai-procurement-list"></div>
+  </div>
+
+  <div class="dashboard-panel card-shadow mt20 critical-dashboard-panel">
+    <div class="dashboard-panel-head">
+      <div>
+        <h3>Critical Spare Parts</h3>
+        <div class="muted">รายการอะไหล่กลุ่ม A ที่ต้องติดตามเป็นพิเศษ โดยเฉพาะรายการใกล้หมดหรือหมดสต็อก</div>
+      </div>
+    </div>
+    <div id="dashboardCriticalList" class="critical-list"></div>
   </div>
 
   <div class="dashboard-layout-grid">
@@ -285,6 +304,13 @@
               <option value="out">หมด</option>
               <option value="low">ใกล้หมด</option>
               <option value="normal">ปกติ</option>
+            </select>
+
+            <select id="importanceFilter" class="compact-input">
+              <option value="">ทุกระดับความสำคัญ</option>
+              <option value="A">A - สำคัญมาก</option>
+              <option value="B">B - สำคัญปานกลาง</option>
+              <option value="C">C - ทั่วไป</option>
             </select>
           </div>
 
@@ -1053,6 +1079,28 @@
               />
               <div id="compatibleMachineChecks" class="compatible-machine-checks"></div>
             </div>
+          </div>
+
+          <div class="form-group full importance-form-box">
+            <label>ระดับความสำคัญของอะไหล่</label>
+            <select id="newPartImportanceLevel" class="compact-input">
+              <option value="A">A - สำคัญมาก / Critical</option>
+              <option value="B">B - สำคัญปานกลาง / Important</option>
+              <option value="C" selected>C - ทั่วไป / Normal</option>
+            </select>
+            <div class="importance-help">
+              A = ขาดแล้วเครื่องหยุดหรือซ่อมไม่ได้, B = มีผลต่อการซ่อมแต่ยังแก้ชั่วคราวได้, C = ของทั่วไป/หาซื้อง่าย
+            </div>
+          </div>
+
+          <div class="form-group full">
+            <label>เหตุผลความสำคัญ</label>
+            <textarea
+              id="newPartImportanceReason"
+              class="compact-input"
+              rows="2"
+              placeholder="เช่น ถ้าขาดแล้วเครื่อง IVF6 หยุดผลิต / ไม่มีของแทน / Lead Time 15 วัน"
+            ></textarea>
           </div>
 
 
