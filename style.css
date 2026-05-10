@@ -8827,3 +8827,329 @@ button[disabled] {
     margin-top: 4px;
   }
 }
+
+/* =========================================================
+   MOBILE ISSUE STEP UX
+   Step 1: Search / Scan / Cart
+   Step 2: Issue Form
+========================================================= */
+
+.issue-step-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.issue-step-header {
+  background: #fff;
+  border-radius: 24px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.issue-step-header h3 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.issue-step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.issue-step-dot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.issue-step-dot span {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #e5e7eb;
+  color: #64748b;
+}
+
+.issue-step-dot.active {
+  color: var(--ios-blue);
+}
+
+.issue-step-dot.active span {
+  background: var(--ios-blue);
+  color: #fff;
+}
+
+.issue-step-line {
+  height: 2px;
+  flex: 1;
+  background: #e5e7eb;
+}
+
+.issue-step-panel {
+  display: none;
+}
+
+.issue-step-panel.active {
+  display: block;
+}
+
+.issue-mobile-card {
+  background: #fff;
+  border-radius: 28px;
+  padding: 22px;
+  position: relative;
+}
+
+.issue-mobile-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.issue-mobile-title h3 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.issue-mobile-title p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.issue-step-badge {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--ios-blue);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.issue-step-badge.orange {
+  background: rgba(255, 149, 0, 0.14);
+  color: #b45309;
+}
+
+.issue-search-actions {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 10px;
+  align-items: center;
+  position: relative;
+}
+
+.issue-selected-head {
+  margin-top: 18px;
+  padding: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+}
+
+.issue-selected-head strong {
+  display: block;
+  font-size: 16px;
+}
+
+.issue-selected-head span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.issue-step-cart-list {
+  min-height: 260px;
+  max-height: 48vh;
+  overflow-y: auto;
+  padding: 6px 0 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.issue-mobile-summary,
+.issue-form-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.issue-mobile-summary > div,
+.issue-form-summary > div {
+  border-radius: 18px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.issue-mobile-summary span,
+.issue-form-summary span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.issue-mobile-summary strong,
+.issue-form-summary strong {
+  display: block;
+  font-size: 24px;
+  color: var(--text-main);
+}
+
+.issue-next-btn {
+  width: 100%;
+  height: 54px;
+  margin-top: 16px;
+  font-size: 16px;
+  border-radius: 18px;
+}
+
+.issue-step-actions {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.issue-step-actions .btn,
+.issue-step-actions .btn-checkout {
+  height: 54px;
+  border-radius: 18px;
+  font-size: 16px;
+}
+
+/* ให้ dropdown อยู่ใต้ช่องค้นหาใน Step 1 */
+#issueStepSearch .search-dropdown {
+  top: 104px;
+  left: 22px;
+  right: 22px;
+  max-height: 420px;
+  z-index: 90;
+}
+
+/* มือถือ */
+@media (max-width: 760px) {
+  .main {
+    padding: 14px 12px !important;
+  }
+
+  .issue-step-header {
+    border-radius: 22px;
+    padding: 16px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .issue-step-header h3 {
+    font-size: 20px;
+  }
+
+  .issue-step-indicator {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .issue-step-dot {
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .issue-step-dot span {
+    width: 30px;
+    height: 30px;
+  }
+
+  .issue-mobile-card {
+    border-radius: 26px;
+    padding: 18px;
+  }
+
+  .issue-mobile-title {
+    flex-direction: column;
+    margin-bottom: 16px;
+  }
+
+  .issue-mobile-title h3 {
+    font-size: 21px;
+  }
+
+  .issue-search-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-search-actions .scan-phone-btn {
+    width: 100%;
+    height: 50px;
+    border-radius: 16px;
+    font-size: 16px;
+  }
+
+  .issue-selected-head {
+    align-items: flex-start;
+  }
+
+  .issue-step-cart-list {
+    min-height: 280px;
+    max-height: 46vh;
+  }
+
+  .issue-mobile-summary,
+  .issue-form-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .issue-step-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-step-actions .btn,
+  .issue-step-actions .btn-checkout {
+    width: 100%;
+  }
+
+  #issueStepSearch .search-dropdown {
+    top: 150px;
+    left: 18px;
+    right: 18px;
+    max-height: 55vh;
+  }
+
+  #issueStepForm .form-group {
+    margin-bottom: 14px;
+  }
+
+  #issueStepForm .compact-input {
+    min-height: 54px;
+    border-radius: 18px !important;
+    font-size: 16px !important;
+  }
+
+  #issueRemark {
+    min-height: 110px;
+  }
+}
