@@ -404,121 +404,175 @@
         </section>
 
         <!-- ISSUE -->
-        <section id="issueSection" class="section">
-          <div class="pos-shop-layout">
-            <div class="pos-shop-main">
-              <div class="card card-shadow flex-col pos-main-card">
-                <div class="pos-top-bar">
-                  <div class="ios-search-box search-wide">
-                    <i>⌕</i>
-                    <input
-                      type="text"
-                      id="issueSearchInput"
-                      placeholder="สแกนบาร์โค้ด หรือพิมพ์ชื่อ / รุ่น / ยี่ห้อ เพื่อเบิกสินค้า..."
-                      autocomplete="off"
-                    />
-                  </div>
+<section id="issueSection" class="section">
+  <div class="issue-step-page">
 
-                  <button id="openIssueCameraBtn" class="btn secondary scan-phone-btn">📷 สแกน</button>
-                </div>
+    <!-- Step Header -->
+    <div class="issue-step-header card-shadow">
+      <div>
+        <h3>เบิกสินค้า</h3>
+        <div class="muted">สแกนหรือค้นหาอะไหล่ก่อน แล้วค่อยกรอกข้อมูลการเบิก</div>
+      </div>
 
-                <div id="issueSearchResults" class="search-dropdown hidden"></div>
-                <div id="issueDetailedCartList" class="fill-scroll"></div>
-              </div>
-            </div>
+      <div class="issue-step-indicator">
+        <div id="issueStepDot1" class="issue-step-dot active">
+          <span>1</span>
+          <small>เลือกอะไหล่</small>
+        </div>
+        <div class="issue-step-line"></div>
+        <div id="issueStepDot2" class="issue-step-dot">
+          <span>2</span>
+          <small>ข้อมูลเบิก</small>
+        </div>
+      </div>
+    </div>
 
-            <aside class="pos-shop-cart card card-shadow">
-              <div class="cart-header">
-                <h3>เบิกสินค้า</h3>
-                <span class="muted">Issue</span>
-              </div>
-
-              <div class="cart-summary-box">
-                <div class="summary-line">
-                  <span>จำนวนรายการ</span>
-                  <strong id="issueTotalItems">0</strong>
-                </div>
-                <div class="summary-line total">
-                  <span>จำนวนรวม</span>
-                  <strong id="issueTotalQty">0</strong>
-                </div>
-
-                <div class="issue-form-title">
-                  <strong>ข้อมูลการเบิก</strong>
-                  <span>ผู้เบิก / รหัส / แผนก ดึงจากรหัสพนักงานอัตโนมัติ</span>
-                </div>
-
-                <div class="form-group mt20">
-                  <label>ผู้เบิก</label>
-                  <input type="text" id="issueEmployeeName" class="compact-input" readonly />
-                </div>
-
-                <div class="form-group">
-                  <label>รหัสพนักงาน</label>
-                  <input type="text" id="issueEmployeeId" class="compact-input" readonly />
-                </div>
-
-                <div class="form-group">
-                  <label>แผนกผู้เบิก</label>
-                  <input type="text" id="issueDepartment" class="compact-input" readonly />
-                </div>
-
-                <div class="form-group">
-                  <label>เครื่องจักร <span class="required">*</span></label>
-                  <input
-                    type="text"
-                    id="issueMachineName"
-                    class="compact-input"
-                    placeholder="เช่น IVF3 / IVF6 / DVF4 / Crusher"
-                    list="issueMachineList"
-                    required
-                  />
-
-                  <datalist id="issueMachineList">
-                    <option value="IVF3"></option>
-                    <option value="IVF4"></option>
-                    <option value="IVF5"></option>
-                    <option value="IVF6"></option>
-                    <option value="IVF7"></option>
-                    <option value="DVF3"></option>
-                    <option value="DVF4"></option>
-                    <option value="Centralized Vacuum No.1"></option>
-                    <option value="Centralized Vacuum No.2"></option>
-                    <option value="Crusher"></option>
-                    <option value="Conveyor"></option>
-                  </datalist>
-                </div>
-
-                <div class="form-group">
-                  <label>เหตุผลการเบิก <span class="required">*</span></label>
-                  <select id="issueReason" class="compact-input" required>
-                    <option value="">เลือกเหตุผลการเบิก</option>
-                    <option value="Machine Repair">ใช้ซ่อมเครื่องจักร</option>
-                    <option value="Preventive Maintenance">ใช้ทำ PM</option>
-                    <option value="TPM Activity">ใช้ทำ TPM</option>
-                    <option value="Replace Damaged Part">เปลี่ยนอะไหล่ชำรุด</option>
-                    <option value="Improve Machine">ปรับปรุงเครื่องจักร</option>
-                    <option value="Emergency Spare">เบิกฉุกเฉิน</option>
-                    <option value="Other">อื่น ๆ</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label>หมายเหตุ</label>
-                  <textarea
-                    id="issueRemark"
-                    rows="2"
-                    class="compact-input"
-                    placeholder="ระบุรายละเอียดเพิ่มเติม เช่น ใช้กับจุดไหน / อาการเสีย / หมายเหตุอื่น ๆ"
-                  ></textarea>
-                </div>
-
-                <button id="confirmIssueBtn" class="btn-checkout btn-checkout-warning">ยืนยันเบิกสินค้า</button>
-                <button id="clearIssueCartBtn" class="btn delete clear-cart-btn">ล้างรายการ</button>
-              </div>
-            </aside>
+    <!-- STEP 1: SEARCH / CART -->
+    <div id="issueStepSearch" class="issue-step-panel active">
+      <div class="issue-mobile-card card-shadow">
+        <div class="issue-mobile-title">
+          <div>
+            <h3>1. เลือกอะไหล่</h3>
+            <p>สแกนบาร์โค้ด หรือพิมพ์ชื่อ / รุ่น / ยี่ห้อ เพื่อเพิ่มรายการเบิก</p>
           </div>
-        </section>
+          <span class="issue-step-badge">Step 1</span>
+        </div>
+
+        <div class="issue-search-actions">
+          <div class="ios-search-box search-wide">
+            <i>⌕</i>
+            <input
+              type="text"
+              id="issueSearchInput"
+              placeholder="สแกนบาร์โค้ด หรือค้นหาอะไหล่..."
+              autocomplete="off"
+            />
+          </div>
+
+          <button id="openIssueCameraBtn" class="btn secondary scan-phone-btn" type="button">
+            📷 สแกน
+          </button>
+        </div>
+
+        <div id="issueSearchResults" class="search-dropdown hidden"></div>
+
+        <div class="issue-selected-head">
+          <div>
+            <strong>รายการที่เลือก</strong>
+            <span>ตรวจสอบจำนวนก่อนกดถัดไป</span>
+          </div>
+          <button id="clearIssueCartBtn" class="btn delete small" type="button">ล้างรายการ</button>
+        </div>
+
+        <div id="issueDetailedCartList" class="issue-step-cart-list"></div>
+
+        <div class="issue-mobile-summary">
+          <div>
+            <span>จำนวนรายการ</span>
+            <strong id="issueTotalItems">0</strong>
+          </div>
+          <div>
+            <span>จำนวนรวม</span>
+            <strong id="issueTotalQty">0</strong>
+          </div>
+        </div>
+
+        <button id="goIssueFormStepBtn" class="btn primary issue-next-btn" type="button">
+          ถัดไป: กรอกข้อมูลการเบิก
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: ISSUE FORM -->
+    <div id="issueStepForm" class="issue-step-panel">
+      <div class="issue-mobile-card card-shadow">
+        <div class="issue-mobile-title">
+          <div>
+            <h3>2. ข้อมูลการเบิก</h3>
+            <p>กรอกเครื่องจักรและเหตุผล แล้วกดยืนยันเบิกสินค้า</p>
+          </div>
+          <span class="issue-step-badge orange">Step 2</span>
+        </div>
+
+        <div class="issue-form-summary">
+          <div>
+            <span>รายการเบิก</span>
+            <strong id="issueFormTotalItems">0</strong>
+          </div>
+          <div>
+            <span>จำนวนรวม</span>
+            <strong id="issueFormTotalQty">0</strong>
+          </div>
+        </div>
+
+        <div class="issue-form-title">
+          <strong>ข้อมูลผู้เบิก</strong>
+          <span>ผู้เบิก / รหัส / แผนก ดึงจากรหัสพนักงานอัตโนมัติ</span>
+        </div>
+
+        <div class="form-group mt20">
+          <label>ผู้เบิก</label>
+          <input type="text" id="issueEmployeeName" class="compact-input" readonly />
+        </div>
+
+        <div class="form-group">
+          <label>รหัสพนักงาน</label>
+          <input type="text" id="issueEmployeeId" class="compact-input" readonly />
+        </div>
+
+        <div class="form-group">
+          <label>แผนกผู้เบิก</label>
+          <input type="text" id="issueDepartment" class="compact-input" readonly />
+        </div>
+
+    <div class="form-group">
+  <label>เครื่องจักร <span class="required">*</span></label>
+  <input
+    type="text"
+    id="issueMachineName"
+    class="compact-input"
+    placeholder="เช่น IVF3 / IVF6 / DVF4 / Crusher"
+    autocomplete="off"
+  />
+</div>
+        <div class="form-group">
+          <label>เหตุผลการเบิก <span class="required">*</span></label>
+          <select id="issueReason" class="compact-input">
+            <option value="">เลือกเหตุผลการเบิก</option>
+            <option value="Machine Repair">ใช้ซ่อมเครื่องจักร</option>
+            <option value="Preventive Maintenance">ใช้ทำ PM</option>
+            <option value="TPM Activity">ใช้ทำ TPM</option>
+            <option value="Replace Damaged Part">เปลี่ยนอะไหล่ชำรุด</option>
+            <option value="Improve Machine">ปรับปรุงเครื่องจักร</option>
+            <option value="Emergency Spare">เบิกฉุกเฉิน</option>
+            <option value="Other">อื่น ๆ</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>หมายเหตุ</label>
+          <textarea
+            id="issueRemark"
+            rows="3"
+            class="compact-input"
+            placeholder="ระบุรายละเอียดเพิ่มเติม เช่น ใช้กับจุดไหน / อาการเสีย / หมายเหตุอื่น ๆ"
+          ></textarea>
+        </div>
+
+        <div class="issue-step-actions">
+          <button id="backIssueSearchStepBtn" class="btn secondary" type="button">
+            ย้อนกลับ
+          </button>
+
+          <button id="confirmIssueBtn" class="btn-checkout btn-checkout-warning" type="button">
+             ยืนยันเบิกสินค้า
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
 
         <!-- PURCHASE -->
    <section id="purchaseSection" class="section">
