@@ -421,6 +421,8 @@ on("#issueSearchResults", "click", (e) => {
   on("#clearIssueCartBtn", "click", () => { state.issueCart = []; renderIssueCart(); });
   on("#confirmReceiveBtn", "click", confirmReceiveAll);
   on("#confirmIssueBtn", "click", confirmIssueAll);
+  on("#goIssueFormStepBtn", "click", goIssueFormStep);
+on("#backIssueSearchStepBtn", "click", goIssueSearchStep);
 
   on("#exportPurchaseBtn", "click", exportPurchaseToExcel);
   on("#refreshPurchaseBtn", "click", refreshAll);
@@ -1345,7 +1347,9 @@ async function handleGlobalScan(code) {
   if ($("#receiveSection").classList.contains("active")) { addItemToCart("receive", part); return; }
   if (!$("#issueSection").classList.contains("active")) document.querySelector(`button[data-section="issueSection"]`)?.click();
   if (Number(part.qty || 0) <= 0) return showToast("สต็อกหมด ไม่สามารถเบิกได้", "error");
-  addItemToCart("issue", part);
+addItemToCart("issue", part);
+setIssueStep?.(1);
+document.getElementById("issueSearchInput")?.focus();
 }
 
 function addItemToCart(type, part) {
@@ -5657,3 +5661,120 @@ document.addEventListener("DOMContentLoaded", () => {
     importanceFilter.addEventListener("change", () => renderPOSGrids?.());
   }
 });
+
+/* =========================================================
+   ISSUE STEP UX
+   Step 1: Search / Scan / Cart
+   Step 2: Issue Form
+========================================================= */
+
+function setIssueStep(step) {
+  const searchPanel = document.getElementById("issueStepSearch");
+  const formPanel = document.getElementById("issueStepForm");
+  const dot1 = document.getElementById("issueStepDot1");
+  const dot2 = document.getElementById("issueStepDot2");
+
+  if (!searchPanel || !formPanel) return;
+
+  const isFormStep = Number(step) === 2;
+
+  searchPanel.classList.toggle("active", !isFormStep);
+  formPanel.classList.toggle("active", isFormStep);
+
+  if (dot1) dot1.classList.toggle("active", !isFormStep);
+  if (dot2) dot2.classList.toggle("active", isFormStep);
+
+  syncIssueFormSummary();
+
+  setTimeout(() => {
+    document.getElementById("issueSection")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }, 50);
+}
+
+function goIssueSearchStep() {
+  setIssueStep(1);
+}
+
+function goIssueFormStep() {
+  if (!state.issueCart || !state.issueCart.length) {
+    showToast("กรุณาสแกนหรือเลือกอะไหล่ก่อน", "warn");
+    document.getElementById("issueSearchInput")?.focus();
+    return;
+  }
+
+  syncIssueFormSummary();
+
+  const user = state.currentUser || {};
+
+  if (document.getElementById("issueEmployeeName")) {
+    document.getElementById("issueEmployeeName").value = user.full_name || "";
+  }
+
+  if (document.getElementById("issueEmployeeId")) {
+    document.getElementById("issueEmployeeId").value = user.employee_code || "";
+  }
+
+  if (document.getElementById("issueDepartment")) {
+    document.getElementById("issueDepartment").value = user.department_code || "";
+  }
+
+  setIssueStep(2);
+
+  setTimeout(() => {
+    document.getElementById("issueMachineName")?.focus();
+  }, 250);
+}
+
+function syncIssueFormSummary() {
+  const totalItems = state.issueCart ? state.issueCart.length : 0;
+  const totalQty = (state.issueCart || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+
+  const itemEl = document.getElementById("issueFormTotalItems");
+  const qtyEl = document.getElementById("issueFormTotalQty");
+
+  if (itemEl) itemEl.textContent = numberFormat(totalItems);
+  if (qtyEl) qtyEl.textContent = numberFormat(totalQty);
+}
+
+/* ทับ renderIssueCart เดิมเล็กน้อย เพื่อให้ Summary ของ Step 2 อัปเดตตามตะกร้า */
+const originalRenderIssueCartForStep = window.renderIssueCart || renderIssueCart;
+
+renderIssueCart = function () {
+  originalRenderIssueCartForStep();
+
+  syncIssueFormSummary();
+
+  const nextBtn = document.getElementById("goIssueFormStepBtn");
+  if (nextBtn) {
+    nextBtn.disabled = !state.issueCart.length;
+    nextBtn.style.opacity = state.issueCart.length ? "1" : "0.55";
+    nextBtn.style.cursor = state.issueCart.length ? "pointer" : "not-allowed";
+  }
+
+  const formPanel = document.getElementById("issueStepForm");
+  if (formPanel?.classList.contains("active") && !state.issueCart.length) {
+    setIssueStep(1);
+  }
+};
+
+/* หลังเบิกสำเร็จ ให้กลับไป Step 1 */
+const originalConfirmIssueAllForStep = window.confirmIssueAll || confirmIssueAll;
+
+confirmIssueAll = async function () {
+  await originalConfirmIssueAllForStep();
+
+  if (!state.issueCart || !state.issueCart.length) {
+    setIssueStep(1);
+
+    const machine = document.getElementById("issueMachineName");
+    const reason = document.getElementById("issueReason");
+    const remark = document.getElementById("issueRemark");
+
+    if (machine) machine.value = "";
+    if (reason) reason.value = "";
+    if (remark) remark.value = "";
+  }
+};
