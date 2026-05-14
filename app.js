@@ -5778,3 +5778,218 @@ confirmIssueAll = async function () {
     if (remark) remark.value = "";
   }
 };
+
+/* =========================================================
+   FIX IMAGE PATH IMPORT / EXPORT
+   วางท้ายสุดของ app.js
+   แก้ปัญหา Import Excel แล้วรูปหาย / image_path กลายเป็น "มีรูป"
+========================================================= */
+
+function cleanImportImagePath(value) {
+  const raw = String(value || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (!raw) return "";
+
+  const badValues = [
+    "มีรูป",
+    "มีรูปภาพ",
+    "ไม่มีรูป",
+    "yes",
+    "true",
+    "y",
+    "no",
+    "false",
+    "-",
+    "n/a",
+    "na",
+    "null",
+    "undefined"
+  ];
+
+  if (badValues.includes(lower)) return "";
+
+  const isDataImage = /^data:image\//i.test(raw);
+  const isHttp = /^https?:\/\//i.test(raw);
+  const isPath = /^(\/|\.\/|\.\.\/|images\/|assets\/|uploads\/)/i.test(raw);
+  const isImageFile = /\.(png|jpg|jpeg|webp|gif|svg)(\?.*)?$/i.test(raw);
+
+  if (isDataImage || isHttp || isPath || isImageFile) return raw;
+
+  return "";
+}
+
+function findExistingPartForImport(part) {
+  const code = String(part.part_code || "").trim();
+  const barcode = String(part.barcode || "").trim();
+
+  return (state.parts || []).find((p) => {
+    return (
+      (code && String(p.part_code || "").trim() === code) ||
+      (barcode && String(p.barcode || "").trim() === barcode)
+    );
+  });
+}
+
+/* override ตัวส่งข้อมูล Import เข้า Supabase */
+window.importPartRowToSupabase = async function (part) {
+  const existing = findExistingPartForImport(part);
+
+  const cleanedImage =
+    cleanImportImagePath(part.image_path) ||
+    cleanImportImagePath(existing?.image_path) ||
+    cleanImportImagePath(existing?.image_url) ||
+    "";
+
+  const payload = {
+    p_barcode: part.barcode || "",
+    p_part_code: part.part_code || "",
+    p_part_name: part.part_name || "",
+    p_model: part.model || "",
+    p_brand: part.brand || "",
+    p_category: part.category || "",
+    p_unit: part.unit || "Pcs",
+    p_stock_location: part.stock_location || "Main MVR/MSR Stock",
+    p_used_departments: part.used_departments || "MVR,MSR",
+    p_shelf_bin: part.shelf_bin || "",
+    p_qty: Number(part.qty || 0),
+    p_min_qty: Number(part.min_qty || 0),
+    p_max_qty: Number(part.max_qty || 0),
+    p_note: part.note || "",
+    p_image_path: cleanedImage
+  };
+
+  let result = await sb.rpc("import_stock_row", payload);
+
+  if (
+    result.error &&
+    String(result.error.message || "").includes("Could not find the function")
+  ) {
+    const fallbackPayload = { ...payload };
+    delete fallbackPayload.p_image_path;
+    result = await sb.rpc("import_stock_row", fallbackPayload);
+  }
+
+  if (result.error) throw result.error;
+
+  if (
+    part.compatible_machines_values &&
+    part.compatible_machines_values.length &&
+    typeof getPartIdByPartCode === "function" &&
+    typeof savePartCompatibleMachines === "function"
+  ) {
+    const partId = await getPartIdByPartCode(part.part_code || part.barcode);
+    if (partId) await savePartCompatibleMachines(partId, part.compatible_machines_values);
+  }
+
+  return result.data || "updated";
+};
+
+try {
+  importPartRowToSupabase = window.importPartRowToSupabase;
+} catch (_) {}
+
+
+/* override normalizeImportExcelRow ถ้ามี */
+if (typeof window.normalizeImportExcelRow === "function") {
+  const oldNormalizeImportExcelRow = window.normalizeImportExcelRow;
+
+  window.normalizeImportExcelRow = function (row, index) {
+    const part = oldNormalizeImportExcelRow(row, index);
+    part.image_path = cleanImportImagePath(part.image_path);
+    return part;
+  };
+
+  try {
+    normalizeImportExcelRow = window.normalizeImportExcelRow;
+  } catch (_) {}
+}
+
+
+/* override normalizeExcelRow ถ้าโค้ดบางชุดยังใช้ชื่อนี้ */
+if (typeof window.normalizeExcelRow === "function") {
+  const oldNormalizeExcelRow = window.normalizeExcelRow;
+
+  window.normalizeExcelRow = function (row) {
+    const part = oldNormalizeExcelRow(row);
+    part.image_path = cleanImportImagePath(part.image_path);
+    return part;
+  };
+
+  try {
+    normalizeExcelRow = window.normalizeExcelRow;
+  } catch (_) {}
+}
+
+
+/* override renderImageOrBox ให้รูปแตกกลายเป็นกล่อง 📦 */
+window.renderImageOrBox = function (src, altText = "part") {
+  const cleanSrc = cleanImportImagePath(src);
+
+  if (!cleanSrc) {
+    return `<span class="part-card-placeholder">📦</span>`;
+  }
+
+  return `
+    <img
+      src="${escapeHtml(cleanSrc)}"
+      alt=""
+      title="${escapeHtml(altText)}"
+      loading="lazy"
+      decoding="async"
+      onerror="this.onerror=null;this.outerHTML='<span class=&quot;part-card-placeholder&quot;>📦</span>';"
+    />
+  `;
+};
+
+try {
+  renderImageOrBox = window.renderImageOrBox;
+} catch (_) {}
+
+
+/* override Export ให้ส่ง image_path จริง ไม่ใช่คำว่า "มีรูป" */
+window.exportPartsRows = function (rows, filePrefix) {
+  if (!rows.length) return showToast("ไม่มีข้อมูลสำหรับส่งออก", "warn");
+
+  const exportRows = rows.map((p, index) => {
+    const st = getStockStatus(p);
+    const realImagePath = cleanImportImagePath(getPartImageSrc(p));
+
+    return {
+      "ลำดับ": index + 1,
+      "สถานะ": st.text,
+      "บาร์โค้ด": p.barcode || "",
+      "รหัสอะไหล่": p.part_code || "",
+      "ชื่ออะไหล่": p.part_name || "",
+      "รุ่น": p.model || "",
+      "ยี่ห้อ": p.brand || "",
+      "หมวดหมู่": p.category || "",
+      "ใช้กับเครื่องจักร": p.compatible_machines || "",
+      "จุดเก็บ": p.stock_location_name || "",
+      "แผนกที่ใช้ร่วมกัน": p.used_departments || "",
+      "ตำแหน่งจัดเก็บ": p.shelf_bin || "",
+      "จำนวนคงเหลือ": Number(p.qty || 0),
+      "หน่วย": p.unit || "Pcs",
+      "Min Qty": Number(p.min_qty || 0),
+      "Max Qty": Number(p.max_qty || 0),
+      "ควรสั่งเพิ่ม": typeof suggestOrderQty === "function" ? suggestOrderQty(p) : "",
+      "image_path": realImagePath,
+      "รูปอะไหล่": realImagePath,
+      "สถานะรูป": realImagePath ? "มีรูป" : "",
+      "หมายเหตุ": p.part_note || "",
+      "วันที่อัปเดต": typeof formatDate === "function" ? formatDate(p.updated_at) : (p.updated_at || "")
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Parts");
+
+  const fileName = `${filePrefix || "parts"}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+};
+
+try {
+  exportPartsRows = window.exportPartsRows;
+} catch (_) {}
